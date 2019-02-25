@@ -6,13 +6,12 @@ namespace SEGSRuntime
 {
     internal class SceneNode
     {
-        public SceneNode(int level)
+        public SceneNode(int nest_level)
         {
             is_LOD_fade_node = 0;
-            m_file_nest_level = level;
+            m_nest_level = nest_level;
         }
 
-        public int m_file_nest_level; //how deep have we gone in the loaded files. 
         GeoStoreDef m_belongs_to_geoset = null;
         public List<SceneNodeChildTransform> m_children=new List<SceneNodeChildTransform>();
         public List<GroupProperty_Data> m_properties = null;
@@ -26,6 +25,7 @@ namespace SEGSRuntime
         public string m_src_bin;
         public Bounds m_bbox;
         public int m_index_in_scenegraph = 0;
+        public int m_nest_level;
 
         public Vector3 m_center;
         public float radius = 0;

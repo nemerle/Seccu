@@ -9,21 +9,24 @@ namespace SEGSRuntime {
     public SceneModifiers m_modifiers = null;
     public Dictionary<string,TextureWrapper> m_loaded_textures=new Dictionary<string,TextureWrapper>();
     const uint tricks_i0_requiredCrc = 0xB46B669E;
+    public Dictionary<string, GeoSet> s_name_to_geoset = new Dictionary<string, GeoSet>();
+    public Dictionary<Model, UnityModel> s_coh_model_to_engine_model = new Dictionary<Model, UnityModel>();
 
     private static RuntimeData s_instance = null;
-
+    public RuntimeData() {
+        s_instance = this;
+    }
     public bool prepare(string directory_path)
     {
         if(!read_prefab_definitions(directory_path))
             return false;
         if(!read_model_modifiers(directory_path))
             return false;
-
+        Debug.Log("CoH runtime data prepared");
         return true;
     }
     bool read_data_to(string directory_path,string storage,SceneModifiers target,uint CRC)
     {
-        Debug.Log("Reading " + directory_path +" " + storage + " ... ");
         BinStore bin_store=new BinStore();
         if(!bin_store.open(directory_path+storage,CRC))
         {
@@ -34,14 +37,12 @@ namespace SEGSRuntime {
         }
 
         bool res=target.loadFrom(bin_store);
-        if(res)
-            Debug.Log( "OK" );
-        else
+        if(!res)
         {
-            Debug.Log( "failure");
+            Debug.Log("Reading " + directory_path +" " + storage + " ... failure");
             Debug.LogWarning("Couldn't load " + directory_path+" " +storage+": wrong file format?");
         }
-
+        
         return res;
     }
 
@@ -68,9 +69,6 @@ namespace SEGSRuntime {
 
     public static RuntimeData get()
     {
-        if (null!=s_instance)
-            return s_instance;
-        s_instance = new RuntimeData();
         return s_instance;
     }
 }

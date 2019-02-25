@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
+using SEGSRuntime;
 using UnityEngine;
 
 namespace SEGSRuntime
@@ -13,11 +15,12 @@ namespace SEGSRuntime
         public string m_base_path;
         public NameList m_renamer=new NameList(); // used to rename prefab nodes to keep all names unique in the loaded graph
         public SceneGraph m_target;
-        public int m_file_nesting_level;
+        public int nesting_level;
 
-        public LoadingContext(int mFileNestingLevel)
+
+        public LoadingContext(int nestingLevel)
         {
-            m_file_nesting_level = mFileNestingLevel;
+            nesting_level = nestingLevel;
         }
 
         internal string buildBaseName(string path)
@@ -73,7 +76,7 @@ namespace SEGSRuntime
 
         public string groupRename(string oldname, bool is_def)
         {
-            string str = oldname.Contains('/') ? oldname : m_renamer.basename + '/' + oldname;
+            string str = oldname.Contains('/') ? String.Copy(oldname) : m_renamer.basename + '/' + oldname;
             if (Tools.groupInLibSub(str))
                 return str;
             if (!is_def && !str.ToLower().Contains("/grp") && !str.ToLower().Contains("/map"))
@@ -123,12 +126,26 @@ namespace SEGSRuntime
 
         public void loadSubgraph(string geopath, PrefabStore prefabs)
         {
-            var fi = new FileInfo(geopath.Replace('/', Path.DirectorySeparatorChar));
-            LoadingContext tmp = new LoadingContext(m_file_nesting_level+1);
-            tmp = (LoadingContext) this.MemberwiseClone();
-            tmp.m_file_nesting_level += 1;
+            var fi = new FileInfo(geopath);
+            LoadingContext tmp = new LoadingContext(nesting_level + 1);
+            tmp.m_renamer = DeepClone<NameList>(m_renamer);
+            tmp.m_target = m_target;
+            tmp.last_node_id = last_node_id;
+            tmp.m_base_path = m_base_path;
             string complete_base_name = Path.GetFileNameWithoutExtension(fi.Name);
-            tmp.loadSceneGraph($"{fi.DirectoryName}/{complete_base_name}.txt", prefabs);
+            
+            tmp.loadSceneGraph(fi.DirectoryName + "/" + complete_base_name + ".txt", prefabs);
+        }
+        public static T DeepClone<T>(T obj)
+        {
+            using (var ms = new MemoryStream())
+            {
+                var formatter = new BinaryFormatter();
+                formatter.Serialize(ms, obj);
+                ms.Position = 0;
+
+                return (T) formatter.Deserialize(ms);
+            }
         }
     }
 }

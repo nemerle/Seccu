@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using SEGSRuntime;
 using UnityEditor.MemoryProfiler;
@@ -262,7 +263,7 @@ namespace SEGSRuntime
 
             if (null == def)
             {
-                Debug.LogError("Missing reference:" + newname);
+                Debug.LogErrorFormat("{0}: Missing reference:{1}=>{2}", ctx.m_renamer.basename,name, newname);
                 return;
             }
 
@@ -397,12 +398,18 @@ namespace SEGSRuntime
                         else
                             m_use_counts[child.node] += 1;
                     }
+
+                    if (node.m_nest_level != 0) //from included file - not a top level node ?
+                    {
+                        if(!m_use_counts.ContainsKey(node))
+                            m_use_counts[node]=0; //just remembering the node, so it won't show in top level ones.  
+                    }
                 }
             }
 
             foreach (SceneNode node in all_converted_defs)
             {
-                if (node.m_file_nest_level==0 && !m_use_counts.ContainsKey(node)) // we're only interesting in top level nodes from source file
+                if (!m_use_counts.ContainsKey(node))
                 {
                     if (topLevelNodes.ContainsKey(node.m_name))
                     {
@@ -428,10 +435,12 @@ namespace SEGSRuntime
             ctx.m_base_path = filename.Substring(0, geobin_idx);
             Debug.Assert(rd.m_prefab_mapping != null);
             string upcase_city = filename;
-            upcase_city = upcase_city.Replace("city", "City");
-            upcase_city = upcase_city.Replace("hazard", "Hazard");
-            upcase_city = upcase_city.Replace("trial", "Trial");
-            upcase_city = upcase_city.Replace("zones", "Zones");
+            upcase_city = upcase_city.Replace("city_", "City_");
+            upcase_city = upcase_city.Replace("hazard_", "Hazard_");
+            upcase_city = upcase_city.Replace("/trial_", "/Trial_");
+            if (upcase_city.StartsWith("trial_"))
+                upcase_city = "Trial_" + upcase_city.Substring(6);    
+            upcase_city = upcase_city.Replace("zones_", "Zones_");
             rd.m_prefab_mapping.sceneGraphWasReset();
             bool res = ctx.loadSceneGraph(maps_idx==-1 ? upcase_city : upcase_city.Substring(maps_idx), rd.m_prefab_mapping);
             if (!res)
@@ -484,14 +493,15 @@ namespace SEGSRuntime
 
         public NodeState isInternalNode(SceneNode sceneNode)
         {
-            if (m_use_counts.TryGetValue(sceneNode,out int use_count))
+            int usecount;
+            if (m_use_counts.TryGetValue(sceneNode, out usecount))
             {
-                return use_count == 1 ? NodeState.InternalNode : NodeState.UsedAsPrefab;
+                return usecount == 1 ? NodeState.InternalNode : NodeState.UsedAsPrefab;
             }
             return NodeState.RootNode;
         }
     }
-
+    [Serializable]
     internal class NameList
     {
         // map from old node name to a new name

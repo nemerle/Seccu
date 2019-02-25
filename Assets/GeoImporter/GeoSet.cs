@@ -4,8 +4,8 @@ using System.IO;
 using UnityEngine;
 using System.Linq;
 using System.Text;
+using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 using UnityEditor;
-using zlib;
 
 namespace SEGSRuntime
 {
@@ -121,7 +121,6 @@ namespace SEGSRuntime
             {
                 return !name.StartsWith("maps");
             }
-
             return !name.StartsWith("grp");
         }
 
@@ -175,26 +174,48 @@ namespace SEGSRuntime
             output.Flush();
         }
 
-        public static void DecompressData(byte[] inData, out byte[] outData)
+        public static void DecompressData(byte[] inData, out byte[] outData, int tgt_size)
         {
-            using (MemoryStream outMemoryStream = new MemoryStream())
-            using (ZOutputStream outZStream = new ZOutputStream(outMemoryStream))
-            using (Stream inMemoryStream = new MemoryStream(inData))
+            ICSharpCode.SharpZipLib.Zip.Compression.Inflater infl =
+                new ICSharpCode.SharpZipLib.Zip.Compression.Inflater(false);
+            var inStream = new InflaterInputStream(new MemoryStream(inData), infl);
+            outData = new byte[tgt_size];
+            int currentIndex = 0;
+            try
             {
-                CopyStream(inMemoryStream, outZStream);
-                outZStream.finish();
-                outData = outMemoryStream.ToArray();
+                int numRead = inStream.Read(outData, 0, tgt_size);
+                if (numRead != tgt_size)
+                {
+                    throw  new Exception();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Unexpected exception - '{0}'", ex.Message);
+                throw;
             }
         }
-        public static void DecompressData(MemoryStream inData, out byte[] outData)
+        public static void DecompressData(MemoryStream inData, out byte[] outData,int tgt_size)
         {
-            using (MemoryStream outMemoryStream = new MemoryStream())
-            using (ZOutputStream outZStream = new ZOutputStream(outMemoryStream))
-            using (Stream inMemoryStream = inData)
+            ICSharpCode.SharpZipLib.Zip.Compression.Inflater infl =
+                new ICSharpCode.SharpZipLib.Zip.Compression.Inflater(false);
+            var inStream = new InflaterInputStream(inData, infl);
+            inStream.IsStreamOwner = false;
+            outData = new byte[tgt_size];
+            int currentIndex = 0;
+            int count = tgt_size;
+            try
             {
-                CopyStream(inMemoryStream, outZStream);
-                outZStream.finish();
-                outData = outMemoryStream.ToArray();
+                int numRead = inStream.Read(outData, 0, tgt_size);
+                if (numRead != tgt_size)
+                {
+                    throw  new Exception();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Unexpected exception - '{0}'", ex.Message);
+                throw;
             }
         }
 
@@ -263,19 +284,16 @@ namespace SEGSRuntime
         public byte[] m_geo_data;
         public int geo_data_size;
         public bool data_loaded = false;
-        static Dictionary<string, GeoSet> s_name_to_geoset = new Dictionary<string, GeoSet>();
 
-        static public Dictionary<Model, UnityModel>
-            s_coh_model_to_engine_model = new Dictionary<Model, UnityModel>();
-
-        static Dictionary<string, TextureWrapper> s_coh_tex_to_wrapper = new Dictionary<string, TextureWrapper>();
+         Dictionary<string, TextureWrapper> s_coh_tex_to_wrapper = new Dictionary<string, TextureWrapper>();
         public string full_geo_path;
 
         /// load the given geoset, used when loading scene-subgraph and nodes
         public static GeoSet Load(string m, string base_path)
         {
+            RuntimeData rd=RuntimeData.get();
             GeoSet res;
-            if (s_name_to_geoset.TryGetValue(m, out res))
+            if (rd.s_name_to_geoset.TryGetValue(m, out res))
                 return res;
 
             return findAndPrepareGeoSet(m, base_path);
@@ -298,7 +316,6 @@ namespace SEGSRuntime
             }
 
             geoset = new GeoSet();
-            DirectoryInfo di = new DirectoryInfo(base_path);
             if (true_path.StartsWith(base_path))
             {
                 geoset.geopath = true_path.Substring(base_path.Length);
@@ -308,9 +325,9 @@ namespace SEGSRuntime
 
             geoset.geosetLoadHeader(fp);
             geoset.full_geo_path = true_path;
-            fp.Seek(0, SeekOrigin.Begin);
-            s_name_to_geoset[fname] = geoset;
             fp.Close();
+            RuntimeData rd=RuntimeData.get();
+            rd.s_name_to_geoset[fname] = geoset;
             return geoset;
         }
 
@@ -502,15 +519,15 @@ namespace SEGSRuntime
         private void geosetLoadHeader(FileStream fp)
         {
             int anm_hdr_size;
-            uint headersize;
+            int headersize;
             BinaryReader br = new BinaryReader(fp, new ASCIIEncoding());
             anm_hdr_size = br.ReadInt32();
             anm_hdr_size -= 4;
-            headersize = br.ReadUInt32();
+            headersize = br.ReadInt32();
 
             byte[] zipmem = br.ReadBytes(anm_hdr_size);
             byte[] decompr;
-            Tools.DecompressData(zipmem, out decompr);
+            Tools.DecompressData(zipmem, out decompr,headersize);
 
             Stream unc_arr = new MemoryStream(decompr);
             BinaryReader decomp_hdr = new BinaryReader(unc_arr, new ASCIIEncoding());
@@ -619,9 +636,11 @@ namespace SEGSRuntime
         public void createEngineModelsFromPrefabSet()
         {
             var model_textures = getModelTextures(tex_names);
+            RuntimeData rd=RuntimeData.get();
+            Debug.LogFormat("Converting geometries for {0},{1}",this.geopath,this.name);
             foreach (Model model in subs)
             {
-                s_coh_model_to_engine_model[model] = model.modelCreateObjectFromModel(model_textures);
+                rd.s_coh_model_to_engine_model[model] = model.modelCreateObjectFromModel(model_textures);
             }
         }
 
@@ -691,7 +710,7 @@ namespace SEGSRuntime
             string fname = getNamedTexturePath(tex_name);
             if (String.IsNullOrEmpty(fname))
             {
-                Debug.LogWarningFormat("LoadTexHeader failed for asset {0}->{1}",tex_name,fname);
+                Debug.LogFormat("LoadTexHeader failed for asset {0}->{1}",tex_name,fname);
                 return null;
             }
             RuntimeData rd=RuntimeData.get();

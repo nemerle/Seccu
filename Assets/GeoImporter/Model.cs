@@ -307,7 +307,7 @@ namespace SEGSRuntime
             if (a1.compressed_size!=0)
             {
                 byte[] unpacked = null;
-                Tools.DecompressData(a1.compressed_data, out unpacked);
+                Tools.DecompressData(a1.compressed_data, out unpacked,a1.uncomp_size);
                 return new MemoryStream(unpacked);
             }
             return a1.compressed_data;

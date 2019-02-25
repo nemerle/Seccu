@@ -151,13 +151,14 @@ namespace SEGSRuntime
                 //qCDebug(logSceneGraph) << "Has surface" << tex->Surface;
             }
 
+            string initial_name = tmod.name;
             tmod.name = Path.GetFileNameWithoutExtension(tmod.name); // cut last extension part
             if (tmod.name.StartsWith("/"))
                 tmod.name = tmod.name.Remove(0, 1);
             string lower_name = tmod.name.ToLower();
             if (m_texture_path_to_mod.ContainsKey(lower_name))
             {
-                //Debug.Log("Duplicate texture info: " + tmod.name);
+                Debug.Log("Duplicate texture info: " + initial_name);
                 return;
             }
 
