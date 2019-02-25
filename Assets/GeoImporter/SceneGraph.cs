@@ -402,7 +402,7 @@ namespace SEGSRuntime
 
             foreach (SceneNode node in all_converted_defs)
             {
-                if (!m_use_counts.ContainsKey(node))
+                if (node.m_file_nest_level==0 && !m_use_counts.ContainsKey(node)) // we're only interesting in top level nodes from source file
                 {
                     if (topLevelNodes.ContainsKey(node.m_name))
                     {
@@ -421,7 +421,7 @@ namespace SEGSRuntime
             RuntimeData rd = RuntimeData.get();
 
             SceneGraph m_scene_graph = new SceneGraph();
-            LoadingContext ctx = new LoadingContext();
+            LoadingContext ctx = new LoadingContext(0);
             ctx.m_target = m_scene_graph;
             int geobin_idx = filename.IndexOf("geobin");
             int maps_idx = filename.IndexOf("maps");
@@ -455,9 +455,9 @@ namespace SEGSRuntime
             return res;
         }
 
-        public SceneNode newDef()
+        public SceneNode newDef(int nest_level)
         {
-            SceneNode res = new SceneNode();
+            SceneNode res = new SceneNode(nest_level);
             res.m_index_in_scenegraph = all_converted_defs.Count;
             all_converted_defs.Add(res);
             res.in_use = true;
@@ -484,10 +484,9 @@ namespace SEGSRuntime
 
         public NodeState isInternalNode(SceneNode sceneNode)
         {
-            int usecount;
-            if (m_use_counts.TryGetValue(sceneNode, out usecount))
+            if (m_use_counts.TryGetValue(sceneNode,out int use_count))
             {
-                return usecount == 1 ? NodeState.InternalNode : NodeState.UsedAsPrefab;
+                return use_count == 1 ? NodeState.InternalNode : NodeState.UsedAsPrefab;
             }
             return NodeState.RootNode;
         }

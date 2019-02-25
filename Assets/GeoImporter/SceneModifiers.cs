@@ -157,7 +157,7 @@ namespace SEGSRuntime
             string lower_name = tmod.name.ToLower();
             if (m_texture_path_to_mod.ContainsKey(lower_name))
             {
-                Debug.Log("Duplicate texture info: " + tmod.name);
+                //Debug.Log("Duplicate texture info: " + tmod.name);
                 return;
             }
 

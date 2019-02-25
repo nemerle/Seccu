@@ -13,6 +13,12 @@ namespace SEGSRuntime
         public string m_base_path;
         public NameList m_renamer=new NameList(); // used to rename prefab nodes to keep all names unique in the loaded graph
         public SceneGraph m_target;
+        public int m_file_nesting_level;
+
+        public LoadingContext(int mFileNestingLevel)
+        {
+            m_file_nesting_level = mFileNestingLevel;
+        }
 
         internal string buildBaseName(string path)
         {
@@ -118,10 +124,11 @@ namespace SEGSRuntime
         public void loadSubgraph(string geopath, PrefabStore prefabs)
         {
             var fi = new FileInfo(geopath.Replace('/', Path.DirectorySeparatorChar));
-            LoadingContext tmp = new LoadingContext();
+            LoadingContext tmp = new LoadingContext(m_file_nesting_level+1);
             tmp = (LoadingContext) this.MemberwiseClone();
+            tmp.m_file_nesting_level += 1;
             string complete_base_name = Path.GetFileNameWithoutExtension(fi.Name);
-            tmp.loadSceneGraph(fi.DirectoryName + "/" + complete_base_name + ".txt", prefabs);
+            tmp.loadSceneGraph($"{fi.DirectoryName}/{complete_base_name}.txt", prefabs);
         }
     }
 }

@@ -6,11 +6,13 @@ namespace SEGSRuntime
 {
     internal class SceneNode
     {
-        public SceneNode()
+        public SceneNode(int level)
         {
             is_LOD_fade_node = 0;
+            m_file_nest_level = level;
         }
 
+        public int m_file_nest_level; //how deep have we gone in the loaded files. 
         GeoStoreDef m_belongs_to_geoset = null;
         public List<SceneNodeChildTransform> m_children=new List<SceneNodeChildTransform>();
         public List<GroupProperty_Data> m_properties = null;
@@ -152,9 +154,9 @@ namespace SEGSRuntime
                 }
 
                 // construct from euler angles
-                Quaternion qPitch = UnityEngine.Quaternion.AngleAxis(dat.rot.x, new Vector3(-1, 0, 0));
-                Quaternion qYaw = UnityEngine.Quaternion.AngleAxis(dat.rot.y, new Vector3(0, 1, 0));
-                Quaternion qRoll = UnityEngine.Quaternion.AngleAxis(dat.rot.z, new Vector3(0, 0, 1));
+                Quaternion qPitch = UnityEngine.Quaternion.AngleAxis(Mathf.Rad2Deg*dat.rot.x, new Vector3(-1, 0, 0));
+                Quaternion qYaw = UnityEngine.Quaternion.AngleAxis(Mathf.Rad2Deg*dat.rot.y, new Vector3(0, 1, 0));
+                Quaternion qRoll = UnityEngine.Quaternion.AngleAxis(Mathf.Rad2Deg*dat.rot.z, new Vector3(0, 0, 1));
                 Quaternion rotQuat = qYaw * qPitch * qRoll;
                 child.m_matrix2 = Matrix4x4.TRS(dat.pos, rotQuat, new Vector3(1, 1, 1));
                 if (null != child.node)

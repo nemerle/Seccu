@@ -123,7 +123,7 @@ namespace SEGSRuntime
             SceneNode node = ctx.m_target.getNodeByName(obj_path);
             if (null == node)
             {
-                node = ctx.m_target.newDef();
+                node = ctx.m_target.newDef(ctx.m_file_nesting_level);
                 node.m_src_bin = path;
                 if (0 != this.p_Property.Count)
                     node.m_properties = new List<GroupProperty_Data>(this.p_Property);

@@ -19,32 +19,29 @@ public class GEOImporter : ScriptedImporter
     private static bool m_RuntimeReady = false;
     internal SceneGraph sg;
     private Dictionary<SceneNode, GameObject> m_imported_prefabs = new Dictionary<SceneNode, GameObject>();
-
-    private static GameObject InstantiateModelForEditing(GameObject model)
-    {
-        GameObject instance = GameObject.Instantiate(model);
-        instance.name = model.name;
-        return instance;
-    }
+    private static readonly int Cull = Shader.PropertyToID("_Cull");
 
     private static GameObject CreatePrefabFromModel(string tgt_path, GameObject modelAsset)
     {
-        SEGSRuntime.Tools.EnsureDirectoryExists(tgt_path);
+        
+        Tools.EnsureDirectoryExists(tgt_path);
 
         string destinationPath = tgt_path + "/" + modelAsset.name + ".prefab";
-
+        //Debug.LogFormat("Prefab for model path '{0}'",destinationPath);
+        
         if (File.Exists(destinationPath))
-            return null;
+        {
+            return AssetDatabase.LoadAssetAtPath<GameObject>(destinationPath);
+        }
         PrefabUtility.SaveAsPrefabAssetAndConnect(modelAsset, destinationPath, InteractionMode.AutomatedAction);
         return modelAsset;
     }
-
+    
     GameObject convertFromRoot(SceneNode n)
     {
         GameObject res;
-        string path = n.m_src_bin;
-        int idx = path.LastIndexOf("geobin");
-        string target_directory = PREFAB_DESTINATION_DIRECTORY + path.Substring(idx);
+        var path = n.m_src_bin;
+        string target_directory = buildNodePrefabPath(n);
         if (sg.isInternalNode(n) == NodeState.UsedAsPrefab && m_imported_prefabs.ContainsKey(n))
         {
             res = null;
@@ -68,6 +65,7 @@ public class GEOImporter : ScriptedImporter
             case NodeState.UsedAsPrefab:
                 if (!m_imported_prefabs.ContainsKey(n))
                 {
+                    Debug.LogFormat("Prefab path is {0} tgt {1}",n.m_src_bin,target_directory);
                     convertChildren(n, path, res);
                     res = CreatePrefabFromModel(target_directory, res);
                     m_imported_prefabs[n] = res;
@@ -80,6 +78,13 @@ public class GEOImporter : ScriptedImporter
         }
 
         return res;
+    }
+
+    private static string buildNodePrefabPath(SceneNode n)
+    {
+        string path = n.m_src_bin;
+        int idx = path.LastIndexOf("geobin");
+        return PREFAB_DESTINATION_DIRECTORY + path.Substring(idx);
     }
 
     private static void convertModel(SceneNode n, GameObject res, bool convert_editor_markers)
@@ -104,7 +109,7 @@ public class GEOImporter : ScriptedImporter
             sup.ModelMod = model_trick;
         }
 
-        mf.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(model_path);
+        //mf.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(model_path);
         if (mf.sharedMesh == null)
         {
             if (model_trick != null)
@@ -146,13 +151,10 @@ public class GEOImporter : ScriptedImporter
                 return;
             if (res_static == null)
                 return;
-            SEGSRuntime.Tools.EnsureDirectoryExists(mesh_path);
+            Tools.EnsureDirectoryExists(mesh_path);
             AssetDatabase.CreateAsset(res_static.m_mesh, model_path);
             AssetDatabase.SaveAssets();
-            if (res_static != null)
-            {
-                mf.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(model_path);
-            }
+            mf.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(model_path);
         }
 
         convertMaterials(ren, mdl);
@@ -161,7 +163,7 @@ public class GEOImporter : ScriptedImporter
     private static void convertMaterials(MeshRenderer ren, Model mdl)
     {
         ModelModifiers model_trick = mdl.trck_node;
-        Material result;
+        Material result; 
         string model_base_name = mdl.name.Split(new string[] {"__"}, StringSplitOptions.None)[0];
         bool isDoubleSided = model_trick != null && model_trick.isFlag(TrickFlags.DoubleSided);
         string mesh_path = mdl.geoset.full_geo_path;
@@ -181,9 +183,11 @@ public class GEOImporter : ScriptedImporter
         Color onlyColor;
         Color tint1 = new Color(1, 1, 1, 1); // Shader Constant 0
         Color tint2 = new Color(1, 1, 1, 1); // Shader Constant 1
-        /*CullMode targetCulling=CULL_CCW;
-        
-        CompareMode depthTest = CMP_LESSEQUAL;
+        CullMode targetCulling = CullMode.Back;//CULL_CCW;
+         /*
+         
+         CompareMode depthTest = CMP_LESSEQUAL;
+         */
         float alphaRef = 0.0f;
         bool depthWrite = true;
         bool isAdditive=false;
@@ -201,7 +205,7 @@ public class GEOImporter : ScriptedImporter
             if ( tflags.HasFlag(TrickFlags.NoZTest) )
             {
                 // simulate disabled Z test
-                depthTest = CMP_ALWAYS;
+                //depthTest = CMP_ALWAYS;
                 depthWrite = false;
             }
             if ( tflags.HasFlag(TrickFlags.NoZWrite) )
@@ -223,10 +227,12 @@ public class GEOImporter : ScriptedImporter
             if ( tflags.HasFlag(TrickFlags.TexBias) )
                 Debug.Log("Unhandled TexBias");
         }
-        HTexture whitetex = tryLoadTexture(ctx,"white.tga");
-        
         var vertex_defines = new List<string>();
         var pixel_defines = new List<string>();
+        Material preconverted=null;
+        /*
+        HTexture whitetex = tryLoadTexture(ctx,"white.tga");
+        
         Material preconverted = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials");
         if(cache.Exists("./converted/Materials/"+model_base_name+"_mtl.xml"))
             preconverted = cache.GetResource<Material>("./converted/Materials/"+model_base_name+"_mtl.xml");
@@ -249,60 +255,62 @@ public class GEOImporter : ScriptedImporter
         }
         pixel_defines.Add("DIFFMAP");
         pixel_defines.Add("ALPHAMASK");
+        */
             switch(mdl.blend_mode)
     {
-    case CoHBlendMode.MULTIPLY:
-        pixel_defines.Add("COH_MULTIPLY");
-        break;
-    case CoHBlendMode.MULTIPLY_REG:
-        if(!depthWrite && isAdditive) {
-            preconverted = cache.GetResource<Material>("Materials/AddAlpha.xml").Clone();
-            preconverted.SetCullMode(CULL_NONE);
-        }
-        pixel_defines.Add("COH_MULTIPLY");
-        break;
-    case CoHBlendMode.COLORBLEND_DUAL:
-        pixel_defines.Add("COH_COLOR_BLEND_DUAL");
-        break;
-    case CoHBlendMode.ADDGLOW:
-        pixel_defines.Add("COH_ADDGLOW");
-        break;
-    case CoHBlendMode.ALPHADETAIL:
-        pixel_defines.Add("COH_ALPHADETAIL");
-        break;
-    case CoHBlendMode.BUMPMAP_MULTIPLY:
-        preconverted = cache.GetResource<Material>("Materials/TexturedDualBump.xml").Clone();
-        pixel_defines.Add("COH_MULTIPLY");
-        break;
-    case CoHBlendMode.BUMPMAP_COLORBLEND_DUAL:
-        preconverted = cache.GetResource<Material>("Materials/TexturedDualBump.xml").Clone();
-        pixel_defines << "COH_COLOR_BLEND_DUAL";
-        break;
-    }
-    if(model_trick!=null && model_trick.isFlag(TrickFlags.SetColor)) {
-        reportUnhandled("SetColor unhandled");
-    }
-    if(mdl.flags.HasFlag(ModelFlags.OBJ_TREE)) {
-        preconverted.SetVertexShaderDefines("TRANSLUCENT");
-        pixel_defines<<"TRANSLUCENT";
-        preconverted.SetShaderParameter("AlphaRef",0.4f);
-        tint1.a = 254.0f/255.0f;
-    }
-    else if(alphaRef!=0.0f)
-        preconverted.SetShaderParameter("AlphaRef",alphaRef);
-    preconverted.SetShaderParameter("Col1",tint1);
-    preconverted.SetShaderParameter("Col2",tint2);
-    preconverted.SetPixelShaderDefines(pixel_defines.join(' '));
-    if(isDoubleSided)
-        preconverted.SetCullMode(CULL_NONE);
+ case CoHBlendMode.MULTIPLY:
+     pixel_defines.Add("COH_MULTIPLY");
+     break;
+ case CoHBlendMode.MULTIPLY_REG:
+     if(!depthWrite && isAdditive) {
+         preconverted = new Material(Shader.Find("Unlit/Additive"));    
+         preconverted.SetInt(Cull, (int)UnityEngine.Rendering.CullMode.Off);
+     }
+     pixel_defines.Add("COH_MULTIPLY");
+     break;
+ case CoHBlendMode.COLORBLEND_DUAL:
+     pixel_defines.Add("COH_COLOR_BLEND_DUAL");
+     break;
+ case CoHBlendMode.ADDGLOW:
+     pixel_defines.Add("COH_ADDGLOW");
+     break;
+ case CoHBlendMode.ALPHADETAIL:
+     pixel_defines.Add("COH_ALPHADETAIL");
+     break;
+ case CoHBlendMode.BUMPMAP_MULTIPLY:
+     //preconverted = cache.GetResource<Material>("Materials/TexturedDualBump.xml").Clone();
+     pixel_defines.Add("COH_MULTIPLY");
+     break;
+ case CoHBlendMode.BUMPMAP_COLORBLEND_DUAL:
+     //preconverted = cache.GetResource<Material>("Materials/TexturedDualBump.xml").Clone();
+     pixel_defines.Add("COH_COLOR_BLEND_DUAL");
+     break;
+ }/*
+ if(model_trick!=null && model_trick.isFlag(TrickFlags.SetColor)) {
+     reportUnhandled("SetColor unhandled");
+ }
+ if(mdl.flags.HasFlag(ModelFlags.OBJ_TREE)) {
+     preconverted.SetVertexShaderDefines("TRANSLUCENT");
+     pixel_defines<<"TRANSLUCENT";
+     preconverted.SetShaderParameter("AlphaRef",0.4f);
+     tint1.a = 254.0f/255.0f;
+ }
+ else if(alphaRef!=0.0f)
+     preconverted.SetShaderParameter("AlphaRef",alphaRef);
+ preconverted.SetShaderParameter("Col1",tint1);
+ preconverted.SetShaderParameter("Col2",tint2);
+ preconverted.SetPixelShaderDefines(pixel_defines.join(' '));
+ if(isDoubleSided)
+     preconverted.SetCullMode(CULL_NONE);
 
-    // int mode= dualTexture ? 4 : 5
-    uint geomidx=0;
-    bool is_single_mat = mdl.texture_bind_info.Count == 1;
-    */
+ // int mode= dualTexture ? 4 : 5
+ uint geomidx=0;
+ bool is_single_mat = mdl.texture_bind_info.Count == 1;
+ */
         Material[] materials = new Material[mdl.texture_bind_info.Count];
         int idx = 0;
         Tools.EnsureDirectoryExists(material_base_path);
+        
         foreach (var texbind in mdl.texture_bind_info)
         {
             string path_material_name = String.Format("{0}/{1}.mat", material_base_path, idx);
@@ -313,8 +321,34 @@ public class GEOImporter : ScriptedImporter
                 TextureWrapper wrap = GeoSet.loadTexHeader(texname);
                 if (wrap != null)
                 {
-                    var mat = new Material(Shader.Find("Diffuse"));
+                    Material mat;
+                    if (preconverted != null)
+                    {
+                        mat = preconverted;
+                    }
+                    else
+                    {
+                        if (isAdditive)
+                        {
+                            mat = new Material(Shader.Find("Unlit/Additive"));
+                            mat.SetColor("_Color",tint1);                    
+                        }
+                        else
+                            mat = new Material(Shader.Find("Diffuse Detail"));                        
+                    }
+                        
                     mat.SetTexture("_MainTex", wrap.tex);
+                    mat.SetTextureScale("_MainTex",wrap.scaleUV0);
+                    if (wrap.detailname != null)
+                    {
+                        TextureWrapper detail = GeoSet.loadTexHeader(wrap.detailname);
+                        if (null!=detail)
+                        {
+                            mat.SetTexture("_Detail", detail.tex);
+                            mat.SetTextureScale("_Detail",wrap.scaleUV0);
+                        }
+                        
+                    }
                     AssetDatabase.CreateAsset(mat,path_material_name);
                     AssetDatabase.SaveAssets();
                     available = AssetDatabase.LoadAssetAtPath<Material>(path_material_name);
@@ -394,19 +428,21 @@ public class GEOImporter : ScriptedImporter
             string basepath = ctx.assetPath.Substring(0, idx - 1);
             if (!basepath.EndsWith("/") && basepath[basepath.Length - 1] != Path.DirectorySeparatorChar)
                 basepath += Path.DirectorySeparatorChar;
-            rd.prepare(basepath);
+            rd.prepare(basepath);                           
         }
-
+        GeoSet.s_coh_model_to_engine_model.Clear();
         Debug.Log("Map load commencing");
         sg = SceneGraph.loadWholeMap(ctx.assetPath);
         Debug.Log("Map load done");
         var top_nodes = sg.calculateUsages();
         if (top_nodes.Count != 0)
         {
-            string target_directory = PREFAB_DESTINATION_DIRECTORY + ctx.assetPath.Substring(idx);
-            SEGSRuntime.Tools.EnsureDirectoryExists(target_directory);
+            //string target_directory = PREFAB_DESTINATION_DIRECTORY + ctx.assetPath.Substring(idx);
             foreach (var pair in top_nodes)
             {
+                string target_directory = buildNodePrefabPath(pair.Value);
+                Tools.EnsureDirectoryExists(target_directory);
+                
                 GameObject top_level = convertFromRoot(pair.Value);
                 CreatePrefabFromModel(target_directory, top_level);
             }

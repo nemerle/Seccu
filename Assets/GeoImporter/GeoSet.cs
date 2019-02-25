@@ -71,7 +71,6 @@ namespace SEGSRuntime
                 if(parts[x].Length==0)
                     continue;
                
-                Debug.LogFormat("Part : {0}",parts[x]);
                 if (Directory.Exists(reconstructed_path + "/" +parts[x]))
                 {
                     reconstructed_path += "/" + parts[x];
@@ -692,7 +691,7 @@ namespace SEGSRuntime
             string fname = getNamedTexturePath(tex_name);
             if (String.IsNullOrEmpty(fname))
             {
-                Debug.LogFormat("LoadTexHeader failed for asset {0}->{1}",tex_name,fname);
+                Debug.LogWarningFormat("LoadTexHeader failed for asset {0}->{1}",tex_name,fname);
                 return null;
             }
             RuntimeData rd=RuntimeData.get();
@@ -709,7 +708,6 @@ namespace SEGSRuntime
             res = new TextureWrapper();
             res.tex = AssetDatabase.LoadAssetAtPath<Texture>(fname);
             
-            Debug.LogFormat("Resource retrieved {0} {1}",fname.Substring(0,fname.LastIndexOf('.')),res.tex!=null);
             res.info = modFromTextureName(Path.GetFileNameWithoutExtension(fname));
             TexOpt texopt_flags = 0;
             if (res.info != null)
