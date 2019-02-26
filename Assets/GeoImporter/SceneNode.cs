@@ -58,6 +58,7 @@ namespace SEGSRuntime
 
         // end of bit flags
         public int m_bone_slot = 0;
+        public DefBeacon_Data m_editor_beacon;
 
         public byte boneId()
         {

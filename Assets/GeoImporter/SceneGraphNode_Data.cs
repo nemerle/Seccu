@@ -40,7 +40,7 @@ namespace SEGSRuntime
         {
             if ((flags & (int) NFlags.Ungroupable) != 0)
             {
-                //        node->is_ungroupable = 1; // only useful for editing
+                //        node.is_ungroupable = 1; // only useful for editing
             }
 
             if ((flags & (int) NFlags.FadeNode) != 0)
@@ -172,7 +172,7 @@ namespace SEGSRuntime
             {
                 Debug.Log("Texture to Replace: " + texData.repl_with);
                 // HInstanceMod tr = InstanceModStorage::instance().create();
-                // tr->addTextureReplacement(tex_repl.texUnit,tex_repl.repl_with);
+                // tr.addTextureReplacement(tex_repl.texUnit,tex_repl.repl_with);
             }
         }
 
@@ -216,7 +216,7 @@ namespace SEGSRuntime
             //NOTE: original engine used the same value for first fog color and ambient light!
             //TODO: MapViewer does not handle this info yet
             // HAmbientLight l = AmbientLightStorage::instance().create()
-            // l->color = light_data.clr;
+            // l.color = light_data.clr;
         }
 
         void postprocessFog(SceneNode node)
@@ -228,11 +228,11 @@ namespace SEGSRuntime
             DefFog_Data fog_data = p_Fog[0];
             //TODO: MapViewer does not handle this info yet
             // HFog f = FogInfoStorage::instance().create()
-            // f->color_1 = fog_data.fogClr1;
-            // f->color_2 = fog_data.fogClr2;
-            // f->radius = fog_data.fogZ;
-            // f->near = fog_data.fogX;
-            // f->far = fog_data.fogY;
+            // f.color_1 = fog_data.fogClr1;
+            // f.color_2 = fog_data.fogClr2;
+            // f.radius = fog_data.fogZ;
+            // f.near = fog_data.fogX;
+            // f.far = fog_data.fogY;
         }
 
         void postprocessEditorBeacon(SceneNode node)
@@ -242,10 +242,7 @@ namespace SEGSRuntime
             // mostly markers like TrafficBeacon/CombatBeacon/BasicBeacon
             DefBeacon_Data bcn = p_Beacon[0];
 //TODO: consider if we want to allow the use of editor beacons ?
-//        HBeacon b = BeaconStorage::instance().create();
-//        b->name = bcn.name;
-//        b->radius = bcn.amplitude;
-//        node->m_editor_beacon=b;
+            node.m_editor_beacon=bcn;
         }
 
         void postprocessSound(SceneNode node)

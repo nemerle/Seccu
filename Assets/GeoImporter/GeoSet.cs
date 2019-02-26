@@ -9,7 +9,7 @@ using UnityEditor;
 
 namespace SEGSRuntime
 {
-    internal enum CoHBlendMode
+    public enum CoHBlendMode
     {
         MULTIPLY = 0,
         MULTIPLY_REG = 1,
@@ -21,10 +21,11 @@ namespace SEGSRuntime
         INVALID = 255,
     };
 
-    internal class TextureWrapper
+    [Serializable]
+    public class TextureWrapper
     {
         [Flags]
-        internal enum TexFlag
+        public enum TexFlag
         {
             ALPHA = 0x0001,
             RGB8 = 0x0002,
@@ -41,11 +42,12 @@ namespace SEGSRuntime
         public Texture tex;
         public string detailname;
         public string bumpmap;
+        [EnumFlag]
         public TexFlag flags = 0;
         public Vector2 scaleUV0 = new Vector2(0, 0);
         public Vector2 scaleUV1 = new Vector2(0, 0);
         public CoHBlendMode BlendType = 0;
-        public TextureModifiers info = null;
+        public TextureModifiers_Data info = null;
     }
 
     internal class Tools
@@ -665,7 +667,7 @@ namespace SEGSRuntime
         /// \param texpath contains a full path to the texture
         /// \return texture modifier object, if any
         ///
-        static TextureModifiers modFromTextureName(string texpath)
+        static TextureModifiers_Data modFromTextureName(string texpath)
         {
             RuntimeData rd = RuntimeData.get();
             List<string> split = texpath.Split('/').ToList();
@@ -685,7 +687,7 @@ namespace SEGSRuntime
             // scan from the back of the texture path, until a modifier is found.
             while (split.Count != 0)
             {
-                TextureModifiers texmod_val;
+                TextureModifiers_Data texmod_val;
                 if (texmods.TryGetValue(split[split.Count - 1].ToLower(), out texmod_val))
                 {
                     return texmod_val;

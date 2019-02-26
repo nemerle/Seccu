@@ -39,16 +39,18 @@ namespace SEGSRuntime
         STSScale    =    0x40000000,
         NotSelectable =  0x80000000,
     };
-    public class ModelModifiers
+    [Serializable]
+    public class ModelModifiers : System.Object
     {
         [SerializeField] public Vector2 ScrollST0;
         [SerializeField] public Vector2 ScrollST1;
         [SerializeField] public Vector2 tex_scale;
         [SerializeField] public Color32 TintColor0;
         [SerializeField] public Color32 TintColor1;
-        [SerializeField] public TrickFlags _TrickFlags=0;
+        [SerializeField] [EnumFlag] 
+        public TrickFlags _TrickFlags=0;
         [SerializeField] public float SortBias=0;
-        public GeometryModifiersData info=null;
+        [NonSerialized] public GeometryModifiersData info=null;
         public ModelModifiers clone()
         {
             return (ModelModifiers)this.MemberwiseClone();

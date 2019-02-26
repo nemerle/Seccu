@@ -278,5 +278,11 @@ namespace SEGSRuntime
             bool result = check_bin_version_and_crc(required_crc);
             return result && read_data_blocks(true);
         }
+
+        public void close()
+        {
+            if(m_understream!=null)
+                m_understream.Close();
+        }
     };
 }

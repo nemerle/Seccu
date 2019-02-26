@@ -43,7 +43,7 @@ namespace SEGSRuntime
         MaterialVolume = 0x10000, // only in I2
     };
 
-    internal class TextureModifiers
+    public class TextureModifiers_Data
     {
         public string src_file;
         public string name;
@@ -59,6 +59,10 @@ namespace SEGSRuntime
         public string Surface; // Name of this surface  WOOD METAL etc.
         public float Gloss;
 
+    };
+
+    internal class TextureModifiers : TextureModifiers_Data
+    {
         public bool loadFrom(BinStore s)
         {
             bool ok = true;
@@ -78,16 +82,17 @@ namespace SEGSRuntime
             Debug.Assert(s.end_encountered());
             return ok;
         }
-    };
+        
+    }
 
     internal class SceneModifiers
     {
-        List<TextureModifiers> texture_mods = new List<TextureModifiers>();
+        List<TextureModifiers_Data> texture_mods = new List<TextureModifiers_Data>();
 
         List<GeometryModifiersData> geometry_mods = new List<GeometryModifiersData>();
 
         // for every directory in the texture's path we can have a modifier.
-        public Dictionary<string, TextureModifiers> m_texture_path_to_mod = new Dictionary<string, TextureModifiers>();
+        public Dictionary<string, TextureModifiers_Data> m_texture_path_to_mod = new Dictionary<string, TextureModifiers_Data>();
         Dictionary<string, GeometryModifiersData> g_tricks_string_hash_tab = new Dictionary<string, GeometryModifiersData>();
 
         public GeometryModifiersData findGeomModifier(string modelname, string trick_path)
@@ -138,7 +143,7 @@ namespace SEGSRuntime
             return ok;
         }
 
-        private void setupTexOpt(TextureModifiers tmod)
+        private void setupTexOpt(TextureModifiers_Data tmod)
         {
             if (tmod.ScaleST0.x == 0.0f)
                 tmod.ScaleST0.x = 1.0f;
@@ -176,7 +181,7 @@ namespace SEGSRuntime
         {
             m_texture_path_to_mod.Clear();
             g_tricks_string_hash_tab.Clear();
-            foreach (TextureModifiers texopt in texture_mods)
+            foreach (TextureModifiers_Data texopt in texture_mods)
                 setupTexOpt(texopt);
             foreach (GeometryModifiers trickinfo in geometry_mods)
                 setupTrick(trickinfo);

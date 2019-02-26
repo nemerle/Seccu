@@ -37,6 +37,8 @@ namespace SEGSRuntime {
         }
 
         bool res=target.loadFrom(bin_store);
+        bin_store.close();
+
         if(!res)
         {
             Debug.Log("Reading " + directory_path +" " + storage + " ... failure");

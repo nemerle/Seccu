@@ -163,8 +163,8 @@ namespace SEGSRuntime
 
     internal class DefBeacon_Data : IBinLoadable
     {
-        string name;
-        float amplitude; // maybe rotation speed ?
+        public string name;
+        public float amplitude; // maybe rotation speed ?
 
         public bool loadFrom(BinStore s)
         {
@@ -334,9 +334,11 @@ namespace SEGSRuntime
             if (!loadFrom(binfile))
             {
                 Debug.LogError("Failed to load data from original bin:" + fixed_path);
+                binfile.close();
                 return false;
             }
 
+            binfile.close();
             return true;
         }
 
