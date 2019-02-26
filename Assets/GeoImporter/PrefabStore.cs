@@ -25,7 +25,7 @@ namespace SEGSRuntime
             {
                 defnames = File.Open(base_path + "bin/defnames.bin", FileMode.Open);
             }
-            catch (Exception e)
+            catch (Exception )
             {
                 Debug.LogError(String.Format("Failed to open {0}/bin/defnames.bin", base_path));
                 return false;

@@ -14,7 +14,7 @@ namespace SEGSRuntime
 
         GeoStoreDef m_belongs_to_geoset = null;
         public List<SceneNodeChildTransform> m_children=new List<SceneNodeChildTransform>();
-        public List<GroupProperty_Data> m_properties = null;
+        public List<GroupProperty_Data2> m_properties = null;
 
         public LightProperties m_light;
         public SoundInfo sound_info;

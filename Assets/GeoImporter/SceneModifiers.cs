@@ -5,6 +5,13 @@ using UnityEngine;
 
 namespace SEGSRuntime
 {
+    internal class Animation
+    {
+        internal BoneAnimTrack getTrackForBone(int v)
+        {
+            return null;
+        }
+    }
     [Flags]
     enum TexOpt : uint
     {
@@ -204,7 +211,7 @@ namespace SEGSRuntime
             if (gmod.StAnim.Count != 0)
             {
                 //        if(setStAnim(&a1->StAnim.front()))
-                if (false)
+                if (setStAnim(gmod.StAnim[0]))
                     gmod.node._TrickFlags |= TrickFlags.STAnimate;
             }
 
@@ -219,6 +226,24 @@ namespace SEGSRuntime
                 return;
             }
             g_tricks_string_hash_tab[lower_name] = gmod;
+        }
+        private Animation getAnimTrack(string resource_path)
+        {
+            return null;
+        }
+        private bool setStAnim(TextureAnim_Data2 stAnim)
+        {
+            if(stAnim==null)
+                return false;
+            Animation atrack = getAnimTrack("tscroll/"+stAnim.scrollType);
+            if(null==atrack)
+            {
+                Debug.LogErrorFormat("Missing texture animation track {0}",stAnim.scrollType);
+                return false;
+            }
+            stAnim.animtrack1 = atrack.getTrackForBone(0);
+            stAnim.animtrack2 = atrack.getTrackForBone(1);
+            throw new NotImplementedException();
         }
     };
 }

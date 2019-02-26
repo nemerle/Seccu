@@ -236,7 +236,6 @@ namespace SEGSRuntime
             uint extracted_2bits_;
             float scaling_val;
             float inv_scale;
-            int tgt_idx = 0;
             List<float> entries = new List<float>();
             byte[] delta_buffer = new byte[(entry_size * 2 * num_entries + 7) / 8];
             data.Read(delta_buffer,0,(int)(entry_size * 2 * num_entries + 7) / 8);

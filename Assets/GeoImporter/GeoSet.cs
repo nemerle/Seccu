@@ -180,7 +180,6 @@ namespace SEGSRuntime
                 new ICSharpCode.SharpZipLib.Zip.Compression.Inflater(false);
             var inStream = new InflaterInputStream(new MemoryStream(inData), infl);
             outData = new byte[tgt_size];
-            int currentIndex = 0;
             try
             {
                 int numRead = inStream.Read(outData, 0, tgt_size);
@@ -202,7 +201,7 @@ namespace SEGSRuntime
             var inStream = new InflaterInputStream(inData, infl);
             inStream.IsStreamOwner = false;
             outData = new byte[tgt_size];
-            int currentIndex = 0;
+
             int count = tgt_size;
             try
             {

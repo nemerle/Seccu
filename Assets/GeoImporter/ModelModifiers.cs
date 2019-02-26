@@ -42,18 +42,13 @@ namespace SEGSRuntime
     public class ModelModifiers
     {
         [SerializeField] public Vector2 ScrollST0;
-        public Vector2 ScrollST1;
-        public Vector2 tex_scale;
-        public Color32 TintColor0;
-        public Color32 TintColor1;
-        public TrickFlags _TrickFlags=0;
-        public float SortBias=0;
+        [SerializeField] public Vector2 ScrollST1;
+        [SerializeField] public Vector2 tex_scale;
+        [SerializeField] public Color32 TintColor0;
+        [SerializeField] public Color32 TintColor1;
+        [SerializeField] public TrickFlags _TrickFlags=0;
+        [SerializeField] public float SortBias=0;
         public GeometryModifiersData info=null;
-        public bool isFlag(TrickFlags v) 
-        {
-            return (_TrickFlags & v)!=0;
-        }
-
         public ModelModifiers clone()
         {
             return (ModelModifiers)this.MemberwiseClone();

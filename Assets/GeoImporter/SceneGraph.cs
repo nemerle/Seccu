@@ -31,13 +31,16 @@ namespace SEGSRuntime
             return ok;
         }
     };
-
-    internal class GroupProperty_Data : IBinLoadable
+        [Serializable]
+    public class GroupProperty_Data2
     {
         public string propName;
         public string propValue;
         public int propertyType; // 1 - propValue contains float radius, 0 propValue is plain string
-
+    };
+    [Serializable]
+    internal class GroupProperty_Data : GroupProperty_Data2,IBinLoadable
+    {
         public bool loadFrom(BinStore s)
         {
             bool ok = true;
@@ -356,7 +359,7 @@ namespace SEGSRuntime
     {
         public Color color;
         public float range;
-        public int is_negative;
+        public bool is_negative;
     };
 
 

@@ -16,7 +16,7 @@ namespace SEGSRuntime
     };
 
     [System.Serializable]
-    public struct BoneAnimTrack
+    public class BoneAnimTrack
     {
         public Quaternion[] rot_keys;
         public Vector3[] pos_keys;

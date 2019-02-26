@@ -126,7 +126,7 @@ namespace SEGSRuntime
                 node = ctx.m_target.newDef(ctx.nesting_level);
                 node.m_src_bin = path;
                 if (0 != this.p_Property.Count)
-                    node.m_properties = new List<GroupProperty_Data>(this.p_Property);
+                    node.m_properties = new List<GroupProperty_Data2>(this.p_Property);
             }
 
             if (this.p_Obj.Length != 0)
@@ -257,7 +257,7 @@ namespace SEGSRuntime
             DefSound_Data snd = p_Sound[0];
             SoundInfo handle = new SoundInfo();
             handle.name = snd.name;
-            handle.radius = snd.sndRadius;
+            handle.radius = snd.sndRadius; 
             handle.ramp_feet = snd.snd_ramp_feet;
             handle.flags = (ushort) snd.sndFlags;
             node.sound_info = handle;
@@ -272,7 +272,7 @@ namespace SEGSRuntime
             {
                 color = omnid.omniColor,
                 range = omnid.Size,
-                is_negative = omnid.isNegative
+                is_negative = omnid.isNegative!=0
             };
         }
     };

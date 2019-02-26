@@ -220,7 +220,13 @@ public class GEOImporter : ScriptedImporter
 
         return null;
     }
-
+    static private T getOrCreateComponent<T>(GameObject on) where T : Component
+    {
+        T res=on.GetComponent<T>();
+        if(res==null)
+            res = on.AddComponent<T>();
+        return res;
+    }
     GameObject convertFromRoot(SceneNode n)
     {
         GameObject res = null;
@@ -231,10 +237,15 @@ public class GEOImporter : ScriptedImporter
             {
                 var prefab = GetPrefabAsset(target_directory, n.m_name);
                 if (prefab != null)
-                    return (GameObject) PrefabUtility.InstantiatePrefab(prefab);
+                    return (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             }
 
             res = new GameObject(n.m_name);
+            // Convert the whole node.
+            
+            // converting node components
+            convertComponents(n, res);
+            // convert model
             if (n.m_model != null)
             {
                 convertModel(n, res, true);
@@ -272,6 +283,45 @@ public class GEOImporter : ScriptedImporter
         return res;
     }
 
+    private static void convertComponents(SceneNode n, GameObject res)
+    {
+        if(n.m_light!=null)
+        {
+            if(n.m_light.is_negative)
+            {
+                Debug.LogWarning("Unity does not support negative lights");
+            }
+            else
+            {
+                Light light = res.AddComponent<Light>();
+                light.color = n.m_light.color;
+                light.range = n.m_light.range;
+                light.type = LightType.Point;
+            }
+        }
+        if (n.m_properties != null)
+        {
+            var sup = getOrCreateComponent<NodeMods>(res);
+            Debug.LogWarningFormat("{0} Has Properties", n.m_name);
+            if (sup.Props.Properties == null && n.m_properties.Count != 0)
+                sup.Props.Properties = n.m_properties;
+        }
+        if(n.sound_info!=null)
+        {
+            Debug.Log("Has sound properties");
+            SoundInfo coh_snd=n.sound_info;
+            var snd = getOrCreateComponent<AudioSource>(res);
+            snd.maxDistance = coh_snd.radius;
+            snd.minDistance = coh_snd.radius-coh_snd.ramp_feet;
+            snd.volume = coh_snd.vol/255.0f; 
+            snd.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(coh_snd.name);
+            if(null==snd.clip)
+            {
+                Debug.LogWarningFormat("Failed to locate sound asset {0}",coh_snd.name);
+            }
+        }
+    }
+
     private static string targetDirForNodePrefab(SceneNode n)
     {
         int idx = n.m_src_bin.LastIndexOf("geobin");
@@ -295,7 +345,7 @@ public class GEOImporter : ScriptedImporter
 
         MeshFilter mf = res.AddComponent<MeshFilter>();
         MeshRenderer ren = res.AddComponent<MeshRenderer>();
-        ModelNodeMods sup = res.AddComponent<ModelNodeMods>();
+        var sup = res.AddComponent<ModelNodeMods>();
         if (model_trick != null)
         {
             sup.ModelMod = model_trick;
@@ -304,21 +354,22 @@ public class GEOImporter : ScriptedImporter
         mf.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(model_path);
         if (model_trick != null)
         {
+            ren.shadowCastingMode = ShadowCastingMode.Off;
             if (model_trick._TrickFlags.HasFlag(TrickFlags.NoDraw))
             {
+                ren.receiveShadows = false;
                 res.tag = "NoDraw";
                 res.layer = 9;
-                ren.shadowCastingMode = ShadowCastingMode.Off;
             }
-
             if (model_trick._TrickFlags.HasFlag(TrickFlags.EditorVisible))
             {
+                ren.receiveShadows = false;
                 res.layer = 9;
-                ren.shadowCastingMode = ShadowCastingMode.Off;
             }
 
             if (model_trick._TrickFlags.HasFlag(TrickFlags.CastShadow))
             {
+                ren.receiveShadows = false;
                 ren.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
             }
 
@@ -356,16 +407,16 @@ public class GEOImporter : ScriptedImporter
     private static void convertMaterials(MeshRenderer ren, Model mdl)
     {
         ModelModifiers model_trick = mdl.trck_node;
-        Material result;
+        
         string model_base_name = mdl.name.Split(new string[] {"__"}, StringSplitOptions.None)[0];
-        bool isDoubleSided = model_trick != null && model_trick.isFlag(TrickFlags.DoubleSided);
+        bool isDoubleSided = model_trick != null && model_trick._TrickFlags.HasFlag(TrickFlags.DoubleSided);
         string mesh_path = mdl.geoset.full_geo_path;
         int obj_lib_idx = mesh_path.IndexOf("object_library");
         if (obj_lib_idx != -1)
             mesh_path = "Assets/Materials/" + mesh_path.Substring(obj_lib_idx);
         string material_base_path = mesh_path + "/" + Path.GetFileNameWithoutExtension(mdl.name);
 
-        if (model_trick != null && model_trick.isFlag(TrickFlags.ColorOnly))
+        if (model_trick != null && model_trick._TrickFlags.HasFlag(TrickFlags.ColorOnly))
         {
 //        result = result.Clone(result.GetName()+"Colored");
 //        result.SetShaderParameter("MatDiffColor",Vector4(1.0, 1.0, 0.2f, 1.0f));
@@ -420,12 +471,10 @@ public class GEOImporter : ScriptedImporter
                 Debug.Log("Unhandled TexBias");
         }
         CompareFunction depthTest = CompareFunction.LessEqual;
-        /*
-        
-        HTexture whitetex = tryLoadTexture(ctx,"white.tga");
-        
+        TextureWrapper whitetex = GeoSet.loadTexHeader("white");
         var vertex_defines = new List<string>();
         var pixel_defines = new List<string>();
+        /*
         Material preconverted = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials");
         if(cache.Exists("./converted/Materials/"+model_base_name+"_mtl.xml"))
             preconverted = cache.GetResource<Material>("./converted/Materials/"+model_base_name+"_mtl.xml");
@@ -446,8 +495,10 @@ public class GEOImporter : ScriptedImporter
         else {
             preconverted=preconverted.Clone();
         }
+        */
         pixel_defines.Add("DIFFMAP");
         pixel_defines.Add("ALPHAMASK");
+        string shader_name;
             switch(mdl.blend_mode)
     {
     case CoHBlendMode.MULTIPLY:
@@ -455,8 +506,8 @@ public class GEOImporter : ScriptedImporter
         break;
     case CoHBlendMode.MULTIPLY_REG:
         if(!depthWrite && isAdditive) {
-            preconverted = cache.GetResource<Material>("Materials/AddAlpha.xml").Clone();
-            preconverted.SetCullMode(CULL_NONE);
+            shader_name = "AddAlpha";
+            targetCulling=CullMode.Off;
         }
         pixel_defines.Add("COH_MULTIPLY");
         break;
@@ -470,25 +521,28 @@ public class GEOImporter : ScriptedImporter
         pixel_defines.Add("COH_ALPHADETAIL");
         break;
     case CoHBlendMode.BUMPMAP_MULTIPLY:
-        preconverted = cache.GetResource<Material>("Materials/TexturedDualBump.xml").Clone();
+        shader_name = "TexturedDualBump";
         pixel_defines.Add("COH_MULTIPLY");
         break;
     case CoHBlendMode.BUMPMAP_COLORBLEND_DUAL:
-        preconverted = cache.GetResource<Material>("Materials/TexturedDualBump.xml").Clone();
-        pixel_defines << "COH_COLOR_BLEND_DUAL";
+        shader_name = "TexturedDualBump";
+        pixel_defines.Add("COH_COLOR_BLEND_DUAL");
         break;
     }
-    if(model_trick!=null && model_trick.isFlag(TrickFlags.SetColor)) {
-        reportUnhandled("SetColor unhandled");
-    }
+    if(model_trick!=null && model_trick._TrickFlags.HasFlag(TrickFlags.SetColor)) 
+        Debug.LogWarning("SetColor unhandled");
     if(mdl.flags.HasFlag(ModelFlags.OBJ_TREE)) {
-        preconverted.SetVertexShaderDefines("TRANSLUCENT");
-        pixel_defines<<"TRANSLUCENT";
-        preconverted.SetShaderParameter("AlphaRef",0.4f);
+        //preconverted.SetVertexShaderDefines("TRANSLUCENT");
+        pixel_defines.Add("TRANSLUCENT");
+        alphaRef = 0.4f;
         tint1.a = 254.0f/255.0f;
     }
-    else if(alphaRef!=0.0f)
-        preconverted.SetShaderParameter("AlphaRef",alphaRef);
+    if(alphaRef!=0.0f)
+    {
+
+        //preconverted.SetShaderParameter("AlphaRef",alphaRef);
+    }
+    /*
     preconverted.SetShaderParameter("Col1",tint1);
     preconverted.SetShaderParameter("Col2",tint2);
     preconverted.SetPixelShaderDefines(pixel_defines.join(' '));
@@ -535,6 +589,7 @@ public class GEOImporter : ScriptedImporter
                     AssetDatabase.CreateAsset(mat, path_material_name);
                     AssetDatabase.SaveAssets();
                     available = AssetDatabase.LoadAssetAtPath<Material>(path_material_name);
+
                 }
             }
 
@@ -602,6 +657,8 @@ public class GEOImporter : ScriptedImporter
         return all_ok;
     }
 
+    private SceneGraph m_previous = null;
+    private string m_previous_asset;
     private static RuntimeData s_runtime_data;
     public override void OnImportAsset(AssetImportContext ctx)
     {
@@ -620,7 +677,15 @@ public class GEOImporter : ScriptedImporter
                 basepath += Path.DirectorySeparatorChar;
             s_runtime_data.prepare(basepath);
         }
-        sg = SceneGraph.loadWholeMap(ctx.assetPath);
+        if(m_previous_asset==null || m_previous==null)
+            sg = SceneGraph.loadWholeMap(ctx.assetPath);
+        else
+        {
+            Debug.Log("Reusing previously loaded graph");
+            sg = m_previous;
+        }
+        m_previous = sg;
+        m_previous_asset = ctx.assetPath;
         var top_nodes = sg.calculateUsages();
         if (top_nodes.Count != 0)
         {
