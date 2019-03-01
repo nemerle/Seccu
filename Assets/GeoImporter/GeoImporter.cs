@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using SEGSRuntime;
 using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
@@ -16,159 +17,6 @@ namespace SEGSRuntime
 {
 }
 
-static public class GameObjectTypeLogging
-{
-    static public void LogStageInformation(GameObject go)
-    {
-        // First check if input GameObject is persistent before checking what stage the GameObject is in 
-        if (EditorUtility.IsPersistent(go))
-        {
-            if (!PrefabUtility.IsPartOfPrefabAsset(go))
-            {
-                Debug.Log(
-                    "The GameObject is a temporary object created during import. OnValidate() is called two times with a temporary object during import: First time is when saving cloned objects to .prefab file. Second event is when reading .prefab file objects during import");
-            }
-            else
-            {
-                Debug.Log("GameObject is part of an imported Prefab Asset (from the Library folder)");
-            }
-
-            return;
-        }
-
-        // If the GameObject is not persistent let's determine which stage we are in first because getting Prefab info depends on it
-        var mainStage = StageUtility.GetMainStageHandle();
-        var currentStage = StageUtility.GetStageHandle(go);
-        if (currentStage == mainStage)
-        {
-            if (PrefabUtility.IsPartOfPrefabInstance(go))
-            {
-                var type = PrefabUtility.GetPrefabAssetType(go);
-                var path = AssetDatabase.GetAssetPath(PrefabUtility.GetCorrespondingObjectFromSource(go));
-                Debug.Log(string.Format(
-                    "GameObject is part of a Prefab Instance in the MainStage and is of type: {0}. It comes from the prefab asset: {1}",
-                    type, path));
-            }
-            else
-            {
-                Debug.Log("GameObject is a plain GameObject in the MainStage");
-            }
-        }
-        else
-        {
-            var prefabStage = PrefabStageUtility.GetPrefabStage(go);
-            if (prefabStage != null)
-            {
-                if (PrefabUtility.IsPartOfPrefabInstance(go))
-                {
-                    var type = PrefabUtility.GetPrefabAssetType(go);
-                    var nestedPrefabPath =
-                        AssetDatabase.GetAssetPath(PrefabUtility.GetCorrespondingObjectFromSource(go));
-                    Debug.Log(string.Format(
-                        "GameObject is in a PrefabStage. The GameObject is part of a nested Prefab Instance and is of type: {0}. The opened Prefab asset is: {1} and the nested Prefab asset is: {2}",
-                        type, prefabStage.prefabAssetPath, nestedPrefabPath));
-                }
-                else
-                {
-                    var prefabAssetRoot = AssetDatabase.LoadAssetAtPath<GameObject>(prefabStage.prefabAssetPath);
-                    var type = PrefabUtility.GetPrefabAssetType(prefabAssetRoot);
-                    Debug.Log(string.Format(
-                        "GameObject is in a PrefabStage. The opened Prefab is of type: {0}. The GameObject comes from the prefab asset: {1}",
-                        type, prefabStage.prefabAssetPath));
-                }
-            }
-            else if (EditorSceneManager.IsPreviewSceneObject(go))
-            {
-                Debug.Log(
-                    "GameObject is not in the MainStage, nor in a PrefabStage. But it is in a PreviewScene so could be used for Preview rendering or other utilities.");
-            }
-            else
-            {
-                Debug.LogError("Unknown GameObject Info");
-            }
-        }
-    }
-
-    static public void LogPrefabInformation(GameObject go)
-    {
-        StringBuilder stringBuilder = new StringBuilder();
-
-        // First check if input GameObject is persistent before checking what stage the GameObject is in 
-        if (EditorUtility.IsPersistent(go))
-        {
-            if (!PrefabUtility.IsPartOfPrefabAsset(go))
-            {
-                stringBuilder.Append(
-                    "The GameObject is a temporary object created during import. OnValidate() is called two times with a temporary object during import: First time is when saving cloned objects to .prefab file. Second event is when reading .prefab file objects during import");
-            }
-            else
-            {
-                stringBuilder.Append("GameObject is part of an imported Prefab Asset (from the Library folder).\n");
-                stringBuilder.AppendLine("Prefab Asset: " + GetPrefabInfoString(go));
-            }
-
-            Debug.Log(stringBuilder.ToString());
-            return;
-        }
-
-        PrefabStage prefabStage = PrefabStageUtility.GetPrefabStage(go);
-        if (prefabStage != null)
-        {
-            GameObject openPrefabThatContentsIsPartOf =
-                AssetDatabase.LoadAssetAtPath<GameObject>(prefabStage.prefabAssetPath);
-            stringBuilder.AppendFormat(
-                "The GameObject is part of the Prefab contents of the Prefab Asset:\n{0}\n\n",
-                GetPrefabInfoString(openPrefabThatContentsIsPartOf));
-        }
-
-        if (!PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            stringBuilder.Append("The GameObject is a plain GameObject (not part of a Prefab instance).\n");
-        }
-        else
-        {
-            // This is the Prefab Asset that can be applied to via the Overrides dropdown.
-            GameObject outermostPrefabAssetObject = PrefabUtility.GetCorrespondingObjectFromSource(go);
-            // This is the Prefab Asset that determines the icon that is shown in the Hierarchy for the nearest root.
-            GameObject nearestRootPrefabAssetObject =
-                AssetDatabase.LoadAssetAtPath<GameObject>(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(go));
-            // This is the Prefab Asset where the original version of the object comes from.
-            GameObject originalPrefabAssetObject = PrefabUtility.GetCorrespondingObjectFromOriginalSource(go);
-            stringBuilder.AppendFormat(
-                @"Prefab Asset of the outermost Prefab instance the input GameObject is part of is:
-{0}
-Prefab Asset of the nearest Prefab instance root the input GameObject is part of is:
-{1}
-Prefab Asset of the innermost Prefab instance the input GameObject is part of is:
-{2}
-Complete nesting chain from outermost to original:
-",
-                GetPrefabInfoString(outermostPrefabAssetObject),
-                GetPrefabInfoString(nearestRootPrefabAssetObject),
-                GetPrefabInfoString(originalPrefabAssetObject));
-
-            GameObject current = outermostPrefabAssetObject;
-            while (current != null)
-            {
-                stringBuilder.AppendLine(GetPrefabInfoString(current));
-                current = PrefabUtility.GetCorrespondingObjectFromSource(current);
-            }
-        }
-
-        stringBuilder.AppendLine("");
-
-        Debug.Log(stringBuilder.ToString());
-    }
-
-    static string GetPrefabInfoString(GameObject prefabAssetGameObject)
-    {
-        string name = prefabAssetGameObject.transform.root.gameObject.name;
-        string assetPath = AssetDatabase.GetAssetPath(prefabAssetGameObject);
-        PrefabAssetType type = PrefabUtility.GetPrefabAssetType(prefabAssetGameObject);
-        return string.Format("<b>{0}</b> (type: {1}) at '{2}'", name, type, assetPath);
-    }
-}
-
 [ScriptedImporter(1, "bin")]
 public class GEOImporter : ScriptedImporter
 {
@@ -177,6 +25,13 @@ public class GEOImporter : ScriptedImporter
     internal SceneGraph sg;
     private Dictionary<SceneNode, GameObject> m_imported_prefabs = new Dictionary<SceneNode, GameObject>();
     private List<string> m_created_prefabs = new List<string>();
+    private SceneGraph m_previous = null;
+    private string m_previous_asset;
+    private static RuntimeData s_runtime_data;
+    private static readonly int CullMode = Shader.PropertyToID("_CullMode");
+    private static readonly int ZTest = Shader.PropertyToID("_ZTest");
+    private static readonly int MainTex = Shader.PropertyToID("_MainTex");
+    private static readonly int Detail = Shader.PropertyToID("_Detail");
 
     private static GameObject InstantiateModelForEditing(GameObject model)
     {
@@ -228,6 +83,98 @@ public class GEOImporter : ScriptedImporter
         return res;
     }
 
+    static void checkForLodGroup(SceneNode n, GameObject inside)
+    {
+        SceneNode child_lod=null;
+        foreach (SceneNodeChildTransform child in n.m_children)
+        {
+            if (child.node != null && child.node.lod_near!=0.0)
+            {
+                if(child_lod!=null)
+                    Debug.LogWarningFormat("Node {0} has multiple children lods!",inside.name);
+                child_lod = child.node;
+            }
+        }
+
+        LODGroup ldgrp;
+        if (child_lod != null)
+        {
+            ldgrp = inside.AddComponent<LODGroup>();
+            List<LOD> lods = new List<LOD>();
+            float max_dist = child_lod.lod_far + child_lod.lod_far_fade;
+            float far_percent = 1.0f - ((child_lod.lod_far + (child_lod.lod_far_fade/1.25f)) / max_dist); // 
+            float near_percent = 1.0f - ((child_lod.lod_near + 0.6f*(child_lod.lod_far-child_lod.lod_near))/ max_dist);
+            var lodentry = new LOD(near_percent, new[] {inside.GetComponent<Renderer>()});
+            lodentry.fadeTransitionWidth = child_lod.lod_far_fade / max_dist;
+            lods.Add(lodentry);
+            lodentry = new LOD(far_percent, new[] {child_lod.generated.GetComponent<Renderer>()});
+            lodentry.fadeTransitionWidth = 0.1f;
+            lods.Add(lodentry);
+            ldgrp.SetLODs(lods.ToArray());
+        }
+        else 
+        {
+            if (n.lod_far != 0.0f && n.lod_near == 0.0f)
+            {
+                ldgrp = inside.AddComponent<LODGroup>();
+                List<LOD> lods = new List<LOD>();
+                var lodentry = new LOD(0.03f, new[] {inside.GetComponent<Renderer>()});
+                lods.Add(lodentry);
+                ldgrp.SetLODs(lods.ToArray());
+            }
+        }
+/*
+        Bounds screen_bounds;
+        Bounds calculated_child_bounds=new Bounds();
+        var self_ren = inside.GetComponent<Renderer>();
+        if (null!=self_ren)
+        {
+            calculated_child_bounds.Encapsulate(self_ren.bounds);
+        }
+        foreach (Renderer ren in inside.GetComponentsInChildren<Renderer>())
+        {
+            calculated_child_bounds.Encapsulate(ren.bounds);
+        }
+        // npw we transform bounds from world space to inside's localspace
+        Vector3 ls_max = inside.transform.InverseTransformPoint(calculated_child_bounds.max);
+        Vector3 ls_min = inside.transform.InverseTransformPoint(calculated_child_bounds.min);
+        calculated_child_bounds.max = ls_max;
+        calculated_child_bounds.min = ls_min;
+        
+        GameObject fakeone = new GameObject();
+        Camera front_cam = fakeone.AddComponent<Camera>();
+        float percent_far = lodValueToPercentage(calculated_child_bounds, fakeone, n.lod_far);
+        float percent_near = lodValueToPercentage(calculated_child_bounds, fakeone, n.lod_near);
+        GameObject.DestroyImmediate(fakeone);
+        entry.renderers = inside.GetComponent<Renderer>();
+*/
+        
+    }
+
+    private static float lodValueToPercentage(Bounds calculated_child_bounds, GameObject fakeone, float lod_value)
+    {
+        Vector3 tgt_center = calculated_child_bounds.center;
+        fakeone.transform.position = new Vector3(lod_value, tgt_center.y, tgt_center.z);
+        float percent_front = getPercentOnScreen(fakeone, calculated_child_bounds);
+
+        fakeone.transform.position = new Vector3(tgt_center.y, lod_value, tgt_center.z);
+        float percent_left = getPercentOnScreen(fakeone, calculated_child_bounds);
+        return Mathf.Max(percent_left, percent_front);
+    }
+
+    private static float getPercentOnScreen(GameObject fakeone, Bounds calculated_child_bounds)
+    {
+        fakeone.transform.LookAt(calculated_child_bounds.center, Vector3.up);
+        Camera camz = fakeone.GetComponent<Camera>();
+        camz.projectionMatrix = Matrix4x4.Perspective(90, 4.0f / 3.0f, 0.01f, 1000);
+        camz.pixelRect = new Rect(0,0,100,100);
+        Vector3 world_pos_min = camz.WorldToScreenPoint(calculated_child_bounds.min);
+        Vector3 world_pos_max = camz.WorldToScreenPoint(calculated_child_bounds.max);
+        float dx = Mathf.Abs(world_pos_max.x - world_pos_min.x);
+        float dy = Mathf.Abs(world_pos_max.y - world_pos_min.y);
+        return dx * dy / 100 * 100;
+    }
+
     GameObject convertFromRoot(SceneNode n)
     {
         GameObject res = null;
@@ -238,10 +185,23 @@ public class GEOImporter : ScriptedImporter
             {
                 var prefab = GetPrefabAsset(target_directory, n.m_name);
                 if (prefab != null)
-                    return (GameObject) PrefabUtility.InstantiatePrefab(prefab);
+                {
+                    res = (GameObject) PrefabUtility.InstantiatePrefab(prefab);
+                    if (n.generated == null)
+                        n.generated = res;
+                    return res;
+                }
+
             }
 
             res = new GameObject(n.m_name);
+            res.isStatic = true;
+            var flgs = GameObjectUtility.GetStaticEditorFlags(res);
+            flgs &= ~StaticEditorFlags.LightmapStatic; 
+                
+            GameObjectUtility.SetStaticEditorFlags(res,flgs);
+            
+            n.generated = res;
             // Convert the whole node.
 
             // converting node components
@@ -257,6 +217,8 @@ public class GEOImporter : ScriptedImporter
                 GameObject.DestroyImmediate(res);
                 return null;
             }
+            
+            checkForLodGroup(n, res);
         }
 
         switch (sg.isInternalNode(n))
@@ -275,7 +237,8 @@ public class GEOImporter : ScriptedImporter
                     return null;
 
                 var res3 = (GameObject) PrefabUtility.InstantiatePrefab(m_imported_prefabs[n]);
-                GameObjectTypeLogging.LogPrefabInformation(res3);
+                if (n.generated == null)
+                    n.generated = res3;
                 return res3;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -284,6 +247,40 @@ public class GEOImporter : ScriptedImporter
         return res;
     }
 
+    static Vector3[] createProbes(int max_vertical, int max_horiz, float radius)
+    {
+        int onion_layers = radius > 30 ? 2 : 1;
+        Vector3[] probe_locations = new Vector3[max_vertical * max_horiz * onion_layers];
+        int index = 0;
+        if (radius > 30)
+        {
+            float layer_radius = radius / 2;
+            for (int m = 0; m < max_horiz; m++)
+            {
+                for (int n = 0; n < max_vertical - 1; n++)
+                {
+                    float x = Mathf.Sin(Mathf.PI * m/max_horiz) * Mathf.Cos(2 * Mathf.PI * n/max_vertical);
+                    float y = Mathf.Sin(Mathf.PI * m/max_horiz) * Mathf.Sin(2 * Mathf.PI * n/max_vertical);
+                    float z = Mathf.Cos(Mathf.PI * m / max_horiz);
+                    probe_locations[index++] = new Vector3(x, y, z) * layer_radius;
+                }
+            }
+
+        }
+        for (int m = 0; m < max_horiz; m++)
+        {
+            for (int n = 0; n < max_vertical - 1; n++)
+            {
+                float x = Mathf.Sin(Mathf.PI * m/max_horiz) * Mathf.Cos(2 * Mathf.PI * n/max_vertical);
+                float y = Mathf.Sin(Mathf.PI * m/max_horiz) * Mathf.Sin(2 * Mathf.PI * n/max_vertical);
+                float z = Mathf.Cos(Mathf.PI * m / max_horiz);
+                probe_locations[index++] = new Vector3(x, y, z) * radius;
+            }
+        }
+
+        return probe_locations;
+
+    }
     private static void convertComponents(SceneNode n, GameObject res)
     {
         if (n.m_light != null)
@@ -294,10 +291,28 @@ public class GEOImporter : ScriptedImporter
             }
             else
             {
-                Light light = res.AddComponent<Light>();
+                // since light object is disabled by default, we don't want to disable ourselves,
+                // since we have light probes
+                var lobj = new GameObject();
+                // Light objects are put into seperate layer, to allow fast sphere collider lookups.
+                lobj.layer = LayerMask.NameToLayer("OmniLights");
+                lobj.transform.SetParent(res.transform);
+                
+                Light light = lobj.AddComponent<Light>();
                 light.color = n.m_light.color;
                 light.range = n.m_light.range;
                 light.type = LightType.Point;
+                light.lightmapBakeType = LightmapBakeType.Realtime;
+                light.cullingMask = ~(1<<9); // Don't light the layer 9 - Editor object
+                light.enabled = false; // light is disabled.
+                
+                SphereCollider sp_c = lobj.AddComponent<SphereCollider>();
+                sp_c.radius = light.range;
+                sp_c.isTrigger = true;
+
+                LightProbeGroup lpb=lobj.AddComponent<LightProbeGroup>();
+                lpb.probePositions = createProbes(3, 2, light.range);
+
             }
         }
 
@@ -416,16 +431,14 @@ public class GEOImporter : ScriptedImporter
                 return;
             }
         }
-
+        if (!mdl.geoset.data_loaded)
+        {
+            mdl.geoset.LoadData();
+            if (mdl.geoset.subs.Count != 0)
+                mdl.geoset.createEngineModelsFromPrefabSet();
+        }
         if (mf.sharedMesh == null)
         {
-            if (!mdl.geoset.data_loaded)
-            {
-                mdl.geoset.LoadData();
-                if (mdl.geoset.subs.Count != 0)
-                    mdl.geoset.createEngineModelsFromPrefabSet();
-            }
-
             UnityModel res_static;
             RuntimeData rd = RuntimeData.get();
             if (!rd.s_coh_model_to_engine_model.TryGetValue(mdl, out res_static))
@@ -460,20 +473,31 @@ public class GEOImporter : ScriptedImporter
                tf == TextureFormat.ETC2_RGBA8 ||
                tf == TextureFormat.ASTC_RGBA_4x4;
     }
+    struct MaterialDescriptor
+    {
+        public bool depthWrite;
+        public bool isAdditive;
+        public CullMode targetCulling;
 
+    }
     private static void convertMaterials(MeshRenderer ren, Model mdl, GameObject tgt)
     {
         ModelModifiers model_trick = mdl.trck_node;
+        GeometryModifiersData geom_trick = mdl.src_mod;
         RuntimeData rd = RuntimeData.get();
+        MaterialDescriptor descriptor;
 
         string model_base_name = mdl.name.Split(new string[] {"__"}, StringSplitOptions.None)[0];
-        bool isDoubleSided = model_trick != null && model_trick._TrickFlags.HasFlag(TrickFlags.DoubleSided);
+        bool isDoubleSided = false;
         string mesh_path = mdl.geoset.full_geo_path;
         int obj_lib_idx = mesh_path.IndexOf("object_library");
         if (obj_lib_idx != -1)
             mesh_path = "Assets/Materials/" + mesh_path.Substring(obj_lib_idx);
         string material_base_path = mesh_path + "/" + Path.GetFileNameWithoutExtension(mdl.name);
-
+        if (mdl.name == "Crate1_med_Wood__TintCrates")
+        {
+            Debug.LogFormat("Crate {0}",mdl.BlendMode.ToString());
+        }
         if (model_trick != null && model_trick._TrickFlags.HasFlag(TrickFlags.ColorOnly))
         {
 //        result = result.Clone(result.GetName()+"Colored");
@@ -486,9 +510,10 @@ public class GEOImporter : ScriptedImporter
         Color tint1 = new Color(1, 1, 1, 1); // Shader Constant 0
         Color tint2 = new Color(1, 1, 1, 1); // Shader Constant 1
         float alphaRef = 0.0f;
-        bool depthWrite = true;
-        bool isAdditive = false;
-        CullMode targetCulling = CullMode.Back;
+        descriptor.depthWrite = true;
+        descriptor.isAdditive = false;
+        descriptor.targetCulling = UnityEngine.Rendering.CullMode.Back;
+        string shader_to_use = "";
 
         bool disableZtest = false;
         if (null != model_trick && model_trick._TrickFlags != 0)
@@ -496,23 +521,23 @@ public class GEOImporter : ScriptedImporter
             var tflags = model_trick._TrickFlags;
             if (tflags.HasFlag(TrickFlags.Additive))
             {
-                isAdditive = true;
+                descriptor.isAdditive = true;
             }
 
             if (tflags.HasFlag(TrickFlags.ColorOnly))
                 onlyColor = model_trick.TintColor0;
             if (tflags.HasFlag(TrickFlags.DoubleSided))
-                targetCulling = CullMode.Off;
+                isDoubleSided = true;
             if (tflags.HasFlag(TrickFlags.NoZTest))
             {
                 // simulate disabled Z test
                 disableZtest = true;
                 //depthTest = CompareFunction.Always;
-                depthWrite = false;
+                descriptor.depthWrite = false;
             }
 
             if (tflags.HasFlag(TrickFlags.NoZWrite))
-                depthWrite = false;
+                descriptor.depthWrite = false;
             if (tflags.HasFlag(TrickFlags.SetColor))
             {
                 tint1 = model_trick.TintColor0;
@@ -521,60 +546,46 @@ public class GEOImporter : ScriptedImporter
                 tint2.a = 1.0f;
             }
 
-            if (tflags.HasFlag(TrickFlags.ReflectTex0 | TrickFlags.ReflectTex1))
+            if (tflags.HasFlag(TrickFlags.ReflectTex0) || tflags.HasFlag(TrickFlags.ReflectTex1))
             {
-                Debug.Log("Unhandled cubemap reflection");
+                shader_to_use = "Custom/ReflectGen";
+                if (mdl.flags.HasFlag(ModelFlags.OBJ_CUBEMAP))
+                {
+                    Debug.Log("Unhandled Cubemap");
+                }
             }
 
             if (tflags.HasFlag(TrickFlags.AlphaRef))
             {
                 //qDebug() << "Unhandled alpha ref";
-                alphaRef = model_trick.info.AlphaRef;
+                alphaRef = geom_trick.AlphaRef;
             }
 
             if (tflags.HasFlag(TrickFlags.TexBias))
                 Debug.Log("Unhandled TexBias");
         }
+        if(isDoubleSided)
+            descriptor.targetCulling = UnityEngine.Rendering.CullMode.Off;
+        else
+            descriptor.targetCulling = UnityEngine.Rendering.CullMode.Back;
 
         CompareFunction depthTest = CompareFunction.LessEqual;
         TextureWrapper whitetex = GeoSet.loadTexHeader("white");
         var vertex_defines = new List<string>();
         var pixel_defines = new List<string>();
-        /*
-        Material preconverted = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials");
-        if(cache.Exists("./converted/Materials/"+model_base_name+"_mtl.xml"))
-            preconverted = cache.GetResource<Material>("./converted/Materials/"+model_base_name+"_mtl.xml");
-        bool noLightAngle= mdl.flags & SEGSRuntime.OBJ_NOLIGHTANGLE;
-        if(!preconverted) {
-            if(mdl.flags&SEGSRuntime.OBJ_TREE)
-            {
-                preconverted = cache.GetResource<Material>("Materials/DefaultVegetation.xml").Clone();
-            }
-            else {
-                if(noLightAngle)
-                    preconverted = cache.GetResource<Material>("Materials/NoLightAngle.xml").Clone();
-                else
-                    preconverted = cache.GetResource<Material>("Materials/TexturedDual.xml").Clone();
-
-            }
-        }
-        else {
-            preconverted=preconverted.Clone();
-        }
-        */
         pixel_defines.Add("DIFFMAP");
         pixel_defines.Add("ALPHAMASK");
         string shader_name;
-        switch (mdl.blend_mode)
+        switch (mdl.BlendMode)
         {
             case CoHBlendMode.MULTIPLY:
                 pixel_defines.Add("COH_MULTIPLY");
                 break;
             case CoHBlendMode.MULTIPLY_REG:
-                if (!depthWrite && isAdditive)
+                if (!descriptor.depthWrite && descriptor.isAdditive)
                 {
                     shader_name = "AddAlpha";
-                    targetCulling = CullMode.Off;
+                    descriptor.targetCulling = UnityEngine.Rendering.CullMode.Off;
                 }
 
                 pixel_defines.Add("COH_MULTIPLY");
@@ -598,8 +609,6 @@ public class GEOImporter : ScriptedImporter
                 break;
         }
 
-        if (model_trick != null && model_trick._TrickFlags.HasFlag(TrickFlags.SetColor))
-            Debug.LogWarning("SetColor unhandled");
         if (mdl.flags.HasFlag(ModelFlags.OBJ_TREE))
         {
             //preconverted.SetVertexShaderDefines("TRANSLUCENT");
@@ -612,31 +621,40 @@ public class GEOImporter : ScriptedImporter
         {
             //preconverted.SetShaderParameter("AlphaRef",alphaRef);
         }
-
+    
         /*
-        preconverted.SetShaderParameter("Col1",tint1);
-        preconverted.SetShaderParameter("Col2",tint2);
         preconverted.SetPixelShaderDefines(pixel_defines.join(' '));
         if(isDoubleSided)
             preconverted.SetCullMode(CULL_NONE);
     
         // int mode= dualTexture ? 4 : 5
-        uint geomidx=0;
         bool is_single_mat = mdl.texture_bind_info.Count == 1;
         */
         Material[] materials = new Material[mdl.texture_bind_info.Count];
+        Material additive = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/InstancedAdditive.mat");
         int idx = 0;
         Tools.EnsureDirectoryExists(material_base_path);
         var sup = tgt.GetComponent<ModelNodeMods>();
+        sup.GeomTricks = geom_trick;
         VBOPointers vbo = mdl.vbo;
+        Shader selected=null;
+        if (descriptor.isAdditive)
+        {
+            selected = Shader.Find("Unlit/Additive");
+        }
+        else
+        {
+            if(!String.IsNullOrEmpty(shader_to_use))
+                selected = Shader.Find(shader_to_use);
+            else
+                selected = Shader.Find("CoH/CoHMult");
+        }
+                                        
+        sup.TexWrappers = vbo.assigned_textures;
         foreach (TextureWrapper wrap in vbo.assigned_textures)
         {
-            bool texhasalpha = textureFormatHasAlpha(((Texture2D) wrap.tex).format);
             string path_material_name = String.Format("{0}/{1}.mat", material_base_path, idx);
             Material available = AssetDatabase.LoadAssetAtPath<Material>(path_material_name);
-            if (null == sup.TexWrappers)
-                sup.TexWrappers = new List<TextureWrapper>();
-            sup.TexWrappers.Add(wrap);
             if (available == null)
             {
                 if (wrap != null)
@@ -647,27 +665,23 @@ public class GEOImporter : ScriptedImporter
                         detail = GeoSet.loadTexHeader(wrap.detailname);
                     }
 
-                    Material mat;
-                    if (isAdditive)
-                    {
-                        mat = new Material(Shader.Find("Unlit/Additive"));
-                        mat.SetColor("_Color", tint1);
-                    }
-                    else
-                    {
-                        if(texhasalpha)
-                            mat = new Material(Shader.Find("Transparent/Diffuse"));
-                        else
-                            mat = new Material(Shader.Find("Diffuse"));
-                    }
+                    Material mat= new Material(selected);
+                    mat.SetColor("_Color", tint1);
+                    mat.SetColor("_Color2", tint2);
+                    mat.SetFloat("_AlphaRef",alphaRef);
 
                     mat.SetTexture("_MainTex", wrap.tex);
                     if (detail != null)
                         mat.SetTexture("_Detail", detail.tex);
-                    mat.SetInt("_ZWrite", depthWrite ? 1 : 0);
+                    if(!descriptor.depthWrite)
+                        mat.SetInt("_ZWrite", 0);
                     if (disableZtest)
-                        mat.SetInt("_ZTest", (int) CompareFunction.Always);
-                    mat.SetInt("_Cull", (int) targetCulling);
+                        mat.SetInt(ZTest, (int) CompareFunction.Always);
+                    
+                    mat.SetInt(CullMode, (int) descriptor.targetCulling);
+                    mat.SetTextureScale(MainTex,wrap.scaleUV1);
+                    mat.SetTextureScale(Detail,wrap.scaleUV0);
+                    mat.SetInt("_CoHMod",(int)mdl.BlendMode);
                     AssetDatabase.CreateAsset(mat, path_material_name);
                     AssetDatabase.SaveAssets();
                     available = AssetDatabase.LoadAssetAtPath<Material>(path_material_name);
@@ -691,8 +705,6 @@ public class GEOImporter : ScriptedImporter
             }
             result = is_single_mat ? preconverted : preconverted.Clone();
             result.SetTexture(TU_DIFFUSE,engine_tex);
-            HTexture custom1 = whitetex;
-            HTexture bump_tex = {};
             if(tex.info)
             {
                 if(!tex.info.Blend.isEmpty())
@@ -703,16 +715,6 @@ public class GEOImporter : ScriptedImporter
             result.SetTexture(TU_CUSTOM1,g_converted_textures[custom1.idx]);
             if(bump_tex)
                 result.SetTexture(TU_NORMAL,g_converted_textures[bump_tex.idx]);
-    
-            QDir modeldir("converted/");
-            bool created = modeldir.mkpath("Materials");
-            assert(created);
-            QString cache_path="./converted/"+mat_name;
-            File mat_res(ctx, cache_path, FILE_WRITE);
-            result.SetName(mat_name);
-            result.Save(mat_res);
-            cache.AddManualResource(result);
-            boxObject.SetMaterial(geomidx-1,cache.GetResource<Material>(mat_name));
             */
         }
 
@@ -743,9 +745,6 @@ public class GEOImporter : ScriptedImporter
         return all_ok;
     }
 
-    private SceneGraph m_previous = null;
-    private string m_previous_asset;
-    private static RuntimeData s_runtime_data;
 
     public override void OnImportAsset(AssetImportContext ctx)
     {

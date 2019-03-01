@@ -1,19 +1,21 @@
-﻿Shader "Unlit/Additive"
+﻿Shader "CoH/Vegetation"
 {
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _Detail ("Detail", 2D) = "grey" {}
-        [PerRenderData] _Color("Color", Color) = (1,1,1,1)
+        _DetailTex ("Detail", 2D) = "white" {}
+        _AlphaRef ("Alpha", Range(0,1)) = 0
+        [PerRendererData] _Sway ("Sway", Vector) = (0,0,0,0)
     }
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        Tags {"Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent"}
+ 
         LOD 100
-        
+        AlphaToMask On
         ZWrite Off
-        Blend One One
-        
+        Cull Off
+        Blend SrcAlpha OneMinusSrcAlpha 
         Pass
         {
             CGPROGRAM
@@ -38,9 +40,8 @@
             };
 
             sampler2D _MainTex;
-            sampler2D _Detail;
+            float _AlphaRef;
             float4 _MainTex_ST;
-            float4 _Color;
 
             v2f vert (appdata v)
             {
@@ -54,18 +55,12 @@
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                fixed4 diffInput = tex2D(_MainTex, i.uv);
-                fixed4 detailInput = tex2D(_Detail, i.uv);
-                fixed4 diffColor;
-                diffColor.rgb = lerp(_Color,diffInput,detailInput.a).rgb; // * 4
-                #ifdef VERTEXCOLOR
-                    diffColor.rgb *= vColor.rgb;
-                #endif
-                diffColor.a = _Color.a;
-                
+                fixed4 col = tex2D(_MainTex, i.uv);
                 // apply fog
-                UNITY_APPLY_FOG(i.fogCoord, diffColor);
-                return diffColor;
+                UNITY_APPLY_FOG(i.fogCoord, col);
+                if(col.a<_AlphaRef)
+                    col.a=0.0;
+                return col;
             }
             ENDCG
         }

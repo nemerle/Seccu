@@ -107,7 +107,7 @@ namespace SEGSRuntime
             g_tricks_string_hash_tab.TryGetValue(bone_trick_name.ToLower(), out result);
             if (result != null)
                 return result;
-            Debug.LogFormat("Can't find modifier for {0} {1} : {2}",trick_path,modelname,bone_trick_name.ToLower());
+            Debug.LogFormat("Found modifier for {0} {1} : {2}",trick_path,modelname,bone_trick_name.ToLower());
             return null;
         }
 

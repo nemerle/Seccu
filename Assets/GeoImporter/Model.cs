@@ -51,10 +51,11 @@ namespace SEGSRuntime
         public BoneInfo bone_info_data = null;
         public GeoSet geoset;
         public ModelModifiers trck_node = null;
+        public GeometryModifiersData src_mod = null;
+        
         public Vector3 scale;
         public uint vertex_count;
         public uint model_tri_count;
-        public CoHBlendMode blend_mode;
 
         public VBOPointers vbo;
 
@@ -62,6 +63,8 @@ namespace SEGSRuntime
         public List<int> m_bones;
         public int m_id;
         public int m_load_state;
+
+        public CoHBlendMode BlendMode { get; set; }
 
         public bool isLoaded()
         {
@@ -75,7 +78,7 @@ namespace SEGSRuntime
 
         void initLoadedModel(List<TextureWrapper> textures)
         {
-            blend_mode = CoHBlendMode.MULTIPLY_REG;
+            BlendMode = CoHBlendMode.MULTIPLY_REG;
             bool isgeo = false;
             if (name.StartsWith("GEO_", StringComparison.OrdinalIgnoreCase))
             {
@@ -112,7 +115,14 @@ namespace SEGSRuntime
                 {
                     flags |= ModelFlags.OBJ_DUALTEXTURE;
                     if (base_tex.BlendType != CoHBlendMode.MULTIPLY)
-                        blend_mode = base_tex.BlendType;
+                    {
+                        if (base_tex.BlendType == CoHBlendMode.COLORBLEND_DUAL)
+                        {
+                            Debug.LogFormat("****************************************************** {0}",base_tex.tex.name);
+                        }
+
+                        BlendMode = base_tex.BlendType;
+                    }
                 }
 
                 if (!String.IsNullOrEmpty(base_tex.bumpmap))
@@ -121,7 +131,7 @@ namespace SEGSRuntime
                     if (wrap.flags.HasFlag(TextureWrapper.TexFlag.BUMPMAP))
                     {
                         flags |= ModelFlags.OBJ_BUMPMAP;
-                        blend_mode = (blend_mode == CoHBlendMode.COLORBLEND_DUAL)
+                        BlendMode = (BlendMode == CoHBlendMode.COLORBLEND_DUAL)
                             ? CoHBlendMode.BUMPMAP_COLORBLEND_DUAL
                             : CoHBlendMode.BUMPMAP_MULTIPLY;
                     }
@@ -132,20 +142,20 @@ namespace SEGSRuntime
                 }
             }
 
-            if (trck_node != null && trck_node.info != null)
+            if (trck_node != null && src_mod != null)
             {
-                flags |= (ModelFlags) trck_node.info.ObjFlags;
+                flags |= (ModelFlags) src_mod.ObjFlags;
             }
 
-            if (blend_mode == CoHBlendMode.COLORBLEND_DUAL ||
-                blend_mode == CoHBlendMode.BUMPMAP_COLORBLEND_DUAL)
+            if (BlendMode == CoHBlendMode.COLORBLEND_DUAL ||
+                BlendMode == CoHBlendMode.BUMPMAP_COLORBLEND_DUAL)
             {
                 if (null == trck_node)
                     trck_node = new ModelModifiers();
                 trck_node._TrickFlags |= TrickFlags.SetColor;
             }
 
-            if (blend_mode == CoHBlendMode.ADDGLOW)
+            if (BlendMode == CoHBlendMode.ADDGLOW)
             {
                 if (null == trck_node)
                     trck_node = new ModelModifiers();
@@ -159,10 +169,10 @@ namespace SEGSRuntime
             if (flags.HasFlag(ModelFlags.OBJ_FORCEOPAQUE)) // force opaque
                 flags &= ~ModelFlags.OBJ_ALPHASORT;
 
-            if (null != trck_node && null != trck_node.info)
+            if (null != trck_node && null != src_mod)
             {
-                if (0 != trck_node.info.blend_mode)
-                    blend_mode = (CoHBlendMode) trck_node.info.blend_mode;
+                if (eBlendMode.MULTIPLY != src_mod.blend_mode)
+                    BlendMode = (CoHBlendMode) src_mod.blend_mode;
             }
         }
 
@@ -422,7 +432,7 @@ namespace SEGSRuntime
 
         private bool bumpMapped()
         {
-            return flags.HasFlag(ModelFlags.OBJ_DRAW_AS_ENT | ModelFlags.OBJ_BUMPMAP);
+            return flags.HasFlag(ModelFlags.OBJ_DRAW_AS_ENT) || flags.HasFlag(ModelFlags.OBJ_BUMPMAP);
         }
 
         public UnityModel modelCreateObjectFromModel(List<TextureWrapper> modelTextures)
@@ -435,18 +445,18 @@ namespace SEGSRuntime
                 vbo.assigned_textures.Add(modelTextures[tbind.tex_idx]);
             }
 
-            var fromScratchModel = new UnityModel();
-            fromScratchModel.m_mesh = new Mesh();
-            fromScratchModel.m_mesh.vertices = vbo.pos;
+            var result = new UnityModel();
+            result.m_mesh = new Mesh();
+            result.m_mesh.vertices = vbo.pos;
             if(vbo.norm!=null)
-                fromScratchModel.m_mesh.normals = vbo.norm;
+                result.m_mesh.normals = vbo.norm;
             if(vbo.uv1!=null)
-                fromScratchModel.m_mesh.uv = vbo.uv1;
+                result.m_mesh.uv = vbo.uv1;
             if(vbo.needs_tangents)
-                fromScratchModel.m_mesh.RecalculateTangents();
-            fromScratchModel.m_mesh.RecalculateBounds();
+                result.m_mesh.RecalculateTangents();
+            result.m_mesh.RecalculateBounds();
             int geom_count = texture_bind_info.Count;
-            fromScratchModel.m_mesh.subMeshCount = geom_count;
+            result.m_mesh.subMeshCount = geom_count;
             int face_offset=0;
             for(int i=0; i<geom_count; ++i)
             {
@@ -459,10 +469,10 @@ namespace SEGSRuntime
                     geom_triangles[3 * vi+1] = tri[1];
                     geom_triangles[3 * vi+2] = tri[2];
                 }
-                fromScratchModel.m_mesh.SetTriangles(geom_triangles,i);
+                result.m_mesh.SetTriangles(geom_triangles,i);
                 face_offset+=tbind.tri_count;
             }
-            return fromScratchModel;
+            return result;
         }
     }
 }

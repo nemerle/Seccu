@@ -15,6 +15,7 @@ namespace SEGSRuntime
         GeoStoreDef m_belongs_to_geoset = null;
         public List<SceneNodeChildTransform> m_children=new List<SceneNodeChildTransform>();
         public List<GroupProperty_Data2> m_properties = null;
+        public GameObject generated = null;
 
         public LightProperties m_light;
         public SoundInfo sound_info;
@@ -102,12 +103,14 @@ namespace SEGSRuntime
             if (mods.LodNear != 0.0f || mods.LodFar != 0.0f || mods.LodNearFade != 0.0f || mods.LodFarFade != 0.0f ||
                 mods.LodScale != 0.0f)
                 lod_fromtrick = true;
+            /*
             if (mods.node._TrickFlags.HasFlag(TrickFlags.NoColl))
                 ; //TODO: disable collisions for this node
             if (mods.node._TrickFlags.HasFlag(TrickFlags.SelectOnly))
                 ; // set the model's triangles as only selectable ?? ( selection mesh ? )
             if (mods.node._TrickFlags.HasFlag(TrickFlags.NotSelectable))
                 ; //
+            */
         }
 
         public void setNodeNameAndPath(SceneGraph scene, string obj_path)

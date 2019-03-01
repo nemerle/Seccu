@@ -7,5 +7,6 @@ namespace SEGSRuntime
     {
         [SerializeField] public ModelModifiers ModelMod;
         [SerializeField] public List<TextureWrapper> TexWrappers;
+        [SerializeField] public GeometryModifiersData GeomTricks;
     }
 }

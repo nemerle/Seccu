@@ -170,7 +170,7 @@ namespace SEGSRuntime
             // and it's a pretty important piece of the puzzle.
             foreach (ReplaceTex_Data texData in p_ReplaceTex)
             {
-                Debug.Log("Texture to Replace: " + texData.repl_with);
+                Debug.LogFormat("Texture to Replace: {0}->{1} ",texData.texIdxToReplace,texData.repl_with);
                 // HInstanceMod tr = InstanceModStorage::instance().create();
                 // tr.addTextureReplacement(tex_repl.texUnit,tex_repl.repl_with);
             }

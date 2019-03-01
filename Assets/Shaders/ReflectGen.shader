@@ -1,4 +1,4 @@
-﻿Shader "Unlit/Additive"
+﻿Shader "Custom/ReflectGen"
 {
     Properties
     {
@@ -11,9 +11,9 @@
         Tags { "Queue"="Transparent" "RenderType"="Transparent" }
         LOD 100
         
-        ZWrite Off
-        Blend One One
-        
+        ZWrite On
+        Blend SrcAlpha OneMinusSrcAlpha
+
         Pass
         {
             CGPROGRAM
@@ -21,20 +21,24 @@
             #pragma fragment frag
             // make fog work
             #pragma multi_compile_fog
+            #pragma target 3.0
 
             #include "UnityCG.cginc"
 
             struct appdata
             {
                 float4 vertex : POSITION;
+                float3 normal : NORMAL;
                 float2 uv : TEXCOORD0;
             };
 
             struct v2f
             {
                 float2 uv : TEXCOORD0;
+                float2 gen_uv : TEXCOORD1;
                 UNITY_FOG_COORDS(1)
                 float4 vertex : SV_POSITION;
+                fixed4 color : COLOR;
             };
 
             sampler2D _MainTex;
@@ -42,26 +46,36 @@
             float4 _MainTex_ST;
             float4 _Color;
 
+            float3 reflectionMap(in float3 normal, in float3 ecPosition3)
+            {
+               float NdotU, m;
+               float3 u;
+               u = normalize(ecPosition3);
+               return (reflect(u, normal));
+            }
             v2f vert (appdata v)
             {
                 v2f o;
+                float3 ecPosition = UnityObjectToViewPos(v.vertex.xyz);
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.gen_uv = reflectionMap( v.normal, ecPosition ).xy;
+
                 UNITY_TRANSFER_FOG(o,o.vertex);
+                o.color.xyz = v.normal * 0.5 + 0.5;
+                o.color.w = 1.0;
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                fixed4 diffInput = tex2D(_MainTex, i.uv);
-                fixed4 detailInput = tex2D(_Detail, i.uv);
+                fixed4 diffInput = tex2D(_MainTex, i.gen_uv);
                 fixed4 diffColor;
-                diffColor.rgb = lerp(_Color,diffInput,detailInput.a).rgb; // * 4
+                diffColor= diffInput; // * 4
                 #ifdef VERTEXCOLOR
                     diffColor.rgb *= vColor.rgb;
                 #endif
-                diffColor.a = _Color.a;
                 
                 // apply fog
                 UNITY_APPLY_FOG(i.fogCoord, diffColor);

@@ -20,7 +20,6 @@ namespace SEGSRuntime
         BUMPMAP_COLORBLEND_DUAL = 6,
         INVALID = 255,
     };
-
     [Serializable]
     public class TextureWrapper
     {
@@ -46,6 +45,7 @@ namespace SEGSRuntime
         public TexFlag flags = 0;
         public Vector2 scaleUV0 = new Vector2(0, 0);
         public Vector2 scaleUV1 = new Vector2(0, 0);
+        [EnumFlag]
         public CoHBlendMode BlendType = 0;
         public TextureModifiers_Data info = null;
     }
@@ -310,7 +310,7 @@ namespace SEGSRuntime
             {
                 fp = File.Open(true_path, FileMode.Open);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Debug.LogError("Can't find .geo file" + fname);
                 return null;
@@ -498,7 +498,7 @@ namespace SEGSRuntime
             z.m_id = v.id;
             z.boneinfo_offset = v.boneinfo;
 
-            z.blend_mode = (CoHBlendMode) v.blend_mode;
+            z.BlendMode = (CoHBlendMode) v.blend_mode;
             z.vertex_count = v.vertex_count;
             z.model_tri_count = v.model_tri_count;
             z.scale = v.m_scale;
@@ -538,7 +538,9 @@ namespace SEGSRuntime
             this.geo_data_size = info.size1;
 
             var ver = decomp_hdr.BaseStream.Position;
-            this.tex_names = convertTextureNames(decomp_hdr);
+            tex_names = convertTextureNames(decomp_hdr);
+
+            
             decomp_hdr.BaseStream.Seek(ver + info.texname_blocksize, SeekOrigin.Begin);
 
             MemoryStream bone_name_stream = new MemoryStream(decomp_hdr.ReadBytes(info.bone_names_size));
@@ -550,8 +552,9 @@ namespace SEGSRuntime
 
             GeosetHeader32 header32 = readGeosetHeader(decomp_hdr);
             Model32[] ptr_subs = readModel32(decomp_hdr, header32.num_subs);
-            this.parent_geoset = this;
-            this.name = new string(header32.name);
+            parent_geoset = this;
+            name = new string(header32.name);
+            name = name.Substring(0, Math.Max(0, name.IndexOf('\0')));
             bool has_alt_pivot = false;
             for (int idx = 0; idx < header32.num_subs; ++idx)
             {
@@ -587,8 +590,12 @@ namespace SEGSRuntime
                 {
                     if (null == m.trck_node)
                         m.trck_node = new ModelModifiers();
+                    if (m.name == "_FLRSHPS_WIN_H__FLRSHPS_Window")
+                    {
+                        Debug.LogFormat("GMod for geoset model {0}",gmod);
+                    }
                     m.trck_node = gmod.node.clone();
-                    m.trck_node.info = gmod;
+                    m.src_mod = gmod;
                 }
             }
         }
@@ -638,7 +645,6 @@ namespace SEGSRuntime
         {
             var model_textures = getModelTextures(tex_names);
             RuntimeData rd=RuntimeData.get();
-            Debug.LogFormat("Converting geometries for {0},{1}",this.geopath,this.name);
             foreach (Model model in subs)
             {
                 rd.s_coh_model_to_engine_model[model] = model.modelCreateObjectFromModel(model_textures);
@@ -657,7 +663,17 @@ namespace SEGSRuntime
                     return resource_path;
                 }
             }
-
+            guids2 = AssetDatabase.FindAssets("t:Texture", new[] {"Assets/Resources/texture_library"});
+            foreach (string gid in guids2)
+            {
+                string resource_path = AssetDatabase.GUIDToAssetPath(gid);
+                if (resource_path.ToLower().Contains(base_name.ToLower()))
+                {
+                    Debug.LogFormat("Has it as different case! {0},{1}",resource_path,base_name);
+                    return resource_path;
+                }
+                
+            }
             return null;
         }
 
@@ -685,6 +701,10 @@ namespace SEGSRuntime
             SceneModifiers mods = rd.m_modifiers;
             var texmods = mods.m_texture_path_to_mod;
             // scan from the back of the texture path, until a modifier is found.
+            if (texpath.Contains("shape"))
+            {
+                Debug.LogFormat("Mod for {0} -{1}",texpath,string.Join(",",split));
+            }
             while (split.Count != 0)
             {
                 TextureModifiers_Data texmod_val;
@@ -728,7 +748,7 @@ namespace SEGSRuntime
             res = new TextureWrapper();
             res.tex = AssetDatabase.LoadAssetAtPath<Texture>(fname);
             
-            res.info = modFromTextureName(Path.GetFileNameWithoutExtension(fname));
+            res.info = modFromTextureName(Path.GetDirectoryName(fname)+"/"+Path.GetFileNameWithoutExtension(fname));
             TexOpt texopt_flags = 0;
             if (res.info != null)
                 texopt_flags = (TexOpt)res.info.Flags;
@@ -758,6 +778,11 @@ namespace SEGSRuntime
                 if (res.info.Blend.Length!=0)
                 {
                     res.flags |= TextureWrapper.TexFlag.DUAL;
+                    if ((CoHBlendMode)res.info.BlendType == CoHBlendMode.COLORBLEND_DUAL)
+                    {
+                        Debug.LogFormat("****************************************************** {0}",res.info.name);
+                    }
+
                     res.BlendType = (CoHBlendMode)res.info.BlendType;
                     res.scaleUV0 =  res.info.ScaleST0;
                     res.scaleUV1 =  res.info.ScaleST1;

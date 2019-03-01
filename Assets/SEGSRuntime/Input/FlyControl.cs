@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class FlyControl : MonoBehaviour
 {
-    float mainSpeed = 100.0f; //regular speed
+    float mainSpeed = 30.0f; //regular speed
     float shiftAdd = 250.0f; //multiplied by how long shift is held.  Basically running
     float maxShift = 1000.0f; //Maximum speed when holdin gshift
     float camSens = 0.25f; //How sensitive it with mouse

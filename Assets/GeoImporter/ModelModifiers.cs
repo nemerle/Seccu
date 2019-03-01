@@ -50,7 +50,7 @@ namespace SEGSRuntime
         [SerializeField] [EnumFlag] 
         public TrickFlags _TrickFlags=0;
         [SerializeField] public float SortBias=0;
-        [NonSerialized] public GeometryModifiersData info=null;
+        //[NonSerialized] public GeometryModifiersData info=null;
         public ModelModifiers clone()
         {
             return (ModelModifiers)this.MemberwiseClone();
