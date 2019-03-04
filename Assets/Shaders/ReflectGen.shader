@@ -6,6 +6,60 @@
         _Detail ("Detail", 2D) = "grey" {}
         [PerRenderData] _Color("Color", Color) = (1,1,1,1)
     }
+
+    SubShader {
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        LOD 100
+        
+        ZWrite Off
+        Blend SrcAlpha OneMinusSrcAlpha
+        CGPROGRAM
+            #pragma surface surf Standard  vertex:vert  alpha
+            struct Input {
+                float2 uv_MainTex : TEXCOORD0;
+                float2 gen_uv : TEXCOORD2;
+                UNITY_FOG_COORDS(1)
+                float4 vertex : SV_POSITION;
+                float4 v_color : COLOR;
+            };
+            sampler2D _MainTex;
+            sampler2D _Detail;
+            float _AlphaRef;
+            fixed4 _Color,_Secondary;
+            int _CoHMod;
+
+            float3 reflectionMap(in float3 normal, in float3 ecPosition3)
+            {
+               float NdotU, m;
+               float3 u;
+               u = normalize(ecPosition3);
+               return (reflect(u, normal));
+            }
+            
+            void vert (inout appdata_full v,out Input tgt) {
+              UNITY_INITIALIZE_OUTPUT(Input,tgt);
+              float3 ecPosition = UnityObjectToViewPos(v.vertex.xyz);
+              tgt.gen_uv = reflectionMap( v.normal, ecPosition );
+            }
+            void surf (Input IN, inout SurfaceOutputStandard o) {
+                float4 res=tex2D (_MainTex, IN.gen_uv);
+                //o.Albedo = res.rgb;
+                o.Albedo.rgb = res;
+                o.Alpha = res.a;
+            }
+        ENDCG
+    }
+    //Fallback "Diffuse"
+  }
+/*
+Shader "Custom/ReflectGen"
+{
+    Properties
+    {
+        _MainTex ("Texture", 2D) = "white" {}
+        _Detail ("Detail", 2D) = "grey" {}
+        [PerRenderData] _Color("Color", Color) = (1,1,1,1)
+    }
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" }
@@ -85,3 +139,5 @@
         }
     }
 }
+
+*/

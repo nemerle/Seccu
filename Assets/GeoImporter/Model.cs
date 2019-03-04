@@ -63,8 +63,20 @@ namespace SEGSRuntime
         public List<int> m_bones;
         public int m_id;
         public int m_load_state;
+        private CoHBlendMode _blendMode;
 
-        public CoHBlendMode BlendMode { get; set; }
+        public CoHBlendMode BlendMode
+        {
+            get => _blendMode;
+            set
+            {
+                if (value == CoHBlendMode.ADDGLOW)
+                {
+                    Debug.Log("Setting addglow");
+                }
+                _blendMode = value;
+            }
+        }
 
         public bool isLoaded()
         {
@@ -116,11 +128,6 @@ namespace SEGSRuntime
                     flags |= ModelFlags.OBJ_DUALTEXTURE;
                     if (base_tex.BlendType != CoHBlendMode.MULTIPLY)
                     {
-                        if (base_tex.BlendType == CoHBlendMode.COLORBLEND_DUAL)
-                        {
-                            Debug.LogFormat("****************************************************** {0}",base_tex.tex.name);
-                        }
-
                         BlendMode = base_tex.BlendType;
                     }
                 }

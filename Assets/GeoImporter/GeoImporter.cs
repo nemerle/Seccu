@@ -285,35 +285,7 @@ public class GEOImporter : ScriptedImporter
     {
         if (n.m_light != null)
         {
-            if (n.m_light.is_negative)
-            {
-                Debug.LogWarning("Unity does not support negative lights");
-            }
-            else
-            {
-                // since light object is disabled by default, we don't want to disable ourselves,
-                // since we have light probes
-                var lobj = new GameObject();
-                // Light objects are put into seperate layer, to allow fast sphere collider lookups.
-                lobj.layer = LayerMask.NameToLayer("OmniLights");
-                lobj.transform.SetParent(res.transform);
-                
-                Light light = lobj.AddComponent<Light>();
-                light.color = n.m_light.color;
-                light.range = n.m_light.range;
-                light.type = LightType.Point;
-                light.lightmapBakeType = LightmapBakeType.Realtime;
-                light.cullingMask = ~(1<<9); // Don't light the layer 9 - Editor object
-                light.enabled = false; // light is disabled.
-                
-                SphereCollider sp_c = lobj.AddComponent<SphereCollider>();
-                sp_c.radius = light.range;
-                sp_c.isTrigger = true;
-
-                LightProbeGroup lpb=lobj.AddComponent<LightProbeGroup>();
-                lpb.probePositions = createProbes(3, 2, light.range);
-
-            }
+            convertLightComponent(n, res);
         }
 
         if (n.m_properties != null)
@@ -356,6 +328,39 @@ public class GEOImporter : ScriptedImporter
                 pm.layer = 9;
                 mr.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Beacon.mat");
             }
+        }
+    }
+
+    private static void convertLightComponent(SceneNode n, GameObject res)
+    {
+        if (n.m_light.is_negative)
+        {
+            Debug.LogWarning("Unity does not support negative lights");
+        }
+        else
+        {
+            // since light object is disabled by default, we don't want to disable ourselves,
+            // since we have light probes
+            var lobj = new GameObject("Omni Light");
+            // Light objects are put into seperate layer, to allow fast sphere collider lookups.
+            lobj.layer = LayerMask.NameToLayer("OmniLights");
+            lobj.transform.SetParent(res.transform);
+
+            Light light = lobj.AddComponent<Light>();
+            light.color = n.m_light.color;
+            light.range = n.m_light.range;
+            light.type = LightType.Point;
+            light.lightmapBakeType = LightmapBakeType.Realtime;
+            light.cullingMask = ~(1 << 9); // Don't light the layer 9 - Editor object
+            light.enabled = true;
+            light.intensity = 4;
+
+            //SphereCollider sp_c = lobj.AddComponent<SphereCollider>();
+            //sp_c.radius = light.range;
+            //sp_c.isTrigger = true;
+
+            //LightProbeGroup lpb=lobj.AddComponent<LightProbeGroup>();
+            //lpb.probePositions = createProbes(3, 2, light.range);
         }
     }
 
@@ -835,7 +840,9 @@ public class CoHPostProcessor : AssetPostprocessor
             if (modelImporter != null)
             {
                 if (modelImporter.sg != null)
-                    Debug.Log("SEGS scene graph available");
+                {
+                //    Debug.Log("SEGS scene graph available");
+                }
             }
         }
     }
@@ -852,7 +859,6 @@ public class CoHPostProcessor : AssetPostprocessor
             {
                 if (!asset.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
                     continue;
-                Debug.LogFormat("Imported {0}", asset);
                 if (asset.ToLower().Contains("geobin"))
                 {
                     //Debug.LogFormat("Remove geobin source ? {0}",AssetDatabase.DeleteAsset(asset));

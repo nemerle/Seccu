@@ -1,4 +1,95 @@
-﻿Shader "CoH/CoHMult"
+﻿  Shader "CoH/CoHMult"
+{
+    Properties
+    {
+        _Color ("Color", Color) = (1,1,1,1)
+        _Secondary ("Secondary", Color) = (1,1,1,1)
+        _MainTex ("Albedo (RGB)", 2D) = "white" {}
+        _Detail ("Detail", 2D) = "white" {}
+        _Glossiness ("Smoothness", Range(0,1)) = 0.01
+        _Metallic ("Metallic", Range(0,1)) = 0.0
+        _AlphaRef ("AlphaRef", Range(0,1)) = 0.0
+        [Enum(SEGSRuntime.CoHBlendMode)] _CoHMod("CoHBlendMode",Int) = 0        
+        [Enum(UnityEngine.Rendering.CullMode)] _CullMode("CullMode",Int) = 2
+        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest("ZTest",Int) = 4
+        [Enum(Off,0,On,1)] _ZWrite("ZWrite",Int) = 1
+    }
+
+    SubShader {
+        LOD 200
+        AlphaToMask On
+        Blend SrcAlpha OneMinusSrcAlpha 
+        Cull [_CullMode]
+        ZTest [_ZTest]
+        ZWrite [_ZWrite]
+        Tags { "Queue"="Opaque" "RenderType"="Opaque" }
+      CGPROGRAM
+      #pragma surface surf Standard  vertex:vert
+      struct Input {
+            float2 uv_MainTex : TEXCOORD0;
+            float2 uv_Detail : TEXCOORD1;
+            float4 v_color : COLOR;
+      };
+        sampler2D _MainTex;
+        sampler2D _Detail;
+        float _AlphaRef;
+        fixed4 _Color,_Secondary;
+        int _CoHMod;
+        
+        void vert (inout appdata_full v, out Input o) {
+          UNITY_INITIALIZE_OUTPUT(Input,o);
+          o.uv_Detail = o.uv_MainTex;
+        }
+        float4 calc_dual_tint(float4 const0, float4 const1, float4 tex0, float4 tex1)
+        {
+            float4 dual_color;
+            dual_color.rgb = lerp(const0.rgb, const1.rgb, tex1.rgb);
+            dual_color.rgb = lerp(dual_color.rgb, float3(1.0, 1.0, 1.0), tex0.w);
+            dual_color.rgb *= tex0.rgb;
+            dual_color.a = tex1.a * const0.a;
+            return dual_color;
+        }
+        float4 calc_single_tint(in float4 color, in float4 tex)
+        {
+            float3 tinted = lerp(color.rgb, tex.rgb, tex.a);
+            return float4( tinted, color.a );
+        }
+
+        void surf (Input IN, inout SurfaceOutputStandard o) {
+            float4 main_tex =tex2D (_MainTex, IN.uv_MainTex);
+            float4 base_color;
+            fixed4 c = main_tex;
+            fixed4 det = tex2D (_Detail, IN.uv_Detail);
+
+            switch(_CoHMod)
+            {
+                case 2: //color blend dual 
+                c = calc_dual_tint(_Color,_Secondary,c,det);
+                break;
+                case 3: // add glow
+                base_color = calc_single_tint(_Color, main_tex );
+                // add glow to the base color from det;
+                c = base_color;
+                c.xyz = c.xyz + det.xyz; 
+                break;
+                default: 
+                    c = c*det * IN.v_color * _Color;
+                    break;
+            }
+            if (c.a <= _AlphaRef)
+            {
+                discard;
+            }
+
+            o.Albedo = c;
+            o.Alpha = 1;
+        }
+      ENDCG
+    }
+    Fallback "Diffuse"
+  }
+/*
+Shader "CoH/CoHMult"
 {
     Properties
     {
@@ -23,6 +114,7 @@
         Cull [_CullMode]
         ZTest [_ZTest]
         ZWrite [_ZWrite]
+        
         Pass
         {
             CGPROGRAM
@@ -81,16 +173,16 @@
             fixed4 frag (v2f IN) : SV_Target
             {
                 // Albedo comes from a texture tinted by color
-                fixed4 c = tex2D (_MainTex, IN.uv) * _Color;
-                fixed4 det = tex2D (_Detail, IN.uv_detail);
+                float4 c = tex2D (_MainTex, IN.uv) ;
+                float4 det = tex2D (_Detail, IN.uv_detail);
                 //
                 switch(_CoHMod)
                 {
                     case 2: //color blend dual 
-                    c = calc_dual_tint(_Color,_Secondary,c,det);                    
+                    c = calc_dual_tint(_Color,_Secondary,c,det);
                     break;
                     default: 
-                        c = c*det * IN.v_color;
+                        c = c*det * IN.v_color *_Color;
                         break;
                 }
                 if (c.a <= _AlphaRef)
@@ -104,3 +196,4 @@
     }
     FallBack "Diffuse"
 }
+*/

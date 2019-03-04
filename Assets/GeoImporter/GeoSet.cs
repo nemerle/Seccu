@@ -45,7 +45,7 @@ namespace SEGSRuntime
         public TexFlag flags = 0;
         public Vector2 scaleUV0 = new Vector2(0, 0);
         public Vector2 scaleUV1 = new Vector2(0, 0);
-        [EnumFlag]
+
         public CoHBlendMode BlendType = 0;
         public TextureModifiers_Data info = null;
     }
@@ -129,16 +129,15 @@ namespace SEGSRuntime
         static public Color32 RGBAToColor32(uint v)
         {
             Color32 res = new Color32();
-            res.a = (byte) (v & 0xFF);
+            res.r = (byte) (v & 0xFF);
             v >>= 8;
             res.b = (byte) (v & 0xFF);
             v >>= 8;
             res.g = (byte) (v & 0xFF);
             v >>= 8;
-            res.r = (byte) (v & 0xFF);
+            res.a = (byte) (v & 0xFF);
             return res;
         }
-
         static public Matrix4x4 transformFromYPRandTranslation(Vector3 pyr, Vector3 translation)
         {
             float cos_p = Mathf.Cos(pyr.x);
@@ -778,11 +777,6 @@ namespace SEGSRuntime
                 if (res.info.Blend.Length!=0)
                 {
                     res.flags |= TextureWrapper.TexFlag.DUAL;
-                    if ((CoHBlendMode)res.info.BlendType == CoHBlendMode.COLORBLEND_DUAL)
-                    {
-                        Debug.LogFormat("****************************************************** {0}",res.info.name);
-                    }
-
                     res.BlendType = (CoHBlendMode)res.info.BlendType;
                     res.scaleUV0 =  res.info.ScaleST0;
                     res.scaleUV1 =  res.info.ScaleST1;
