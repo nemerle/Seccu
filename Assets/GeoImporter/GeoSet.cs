@@ -673,6 +673,7 @@ namespace SEGSRuntime
                 }
                 
             }
+            Debug.LogFormat("Can't find resource with base name {0}",base_name);
             return null;
         }
 

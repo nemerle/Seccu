@@ -42,7 +42,7 @@ public class GEOImporter : ScriptedImporter
 
     private static string GetSafeFilename(string filename)
     {
-        return string.Join("_", filename.Split(new char[] {'?', '+'}));
+        return string.Join("_", filename.Split(new[] {'?', '+'}));
     }
 
     private static GameObject GetPrefabAsset(string tgt_path, string model_name)
@@ -85,30 +85,32 @@ public class GEOImporter : ScriptedImporter
 
     static void checkForLodGroup(SceneNode n, GameObject inside)
     {
-        SceneNode child_lod=null;
+        SortedList<float, SceneNode> lod_sorted = new SortedList<float, SceneNode>(); 
         foreach (SceneNodeChildTransform child in n.m_children)
         {
             if (child.node != null && child.node.lod_near!=0.0)
             {
-                if(child_lod!=null)
-                    Debug.LogWarningFormat("Node {0} has multiple children lods!",inside.name);
-                child_lod = child.node;
+                lod_sorted.Add(child.node.lod_near,child.node);
             }
         }
 
         LODGroup ldgrp;
-        if (child_lod != null)
+        if (lod_sorted.Count != 0)
         {
             ldgrp = inside.AddComponent<LODGroup>();
+            SceneNode last_node = lod_sorted.Values.Last();
+            float max_dist = last_node.lod_far + last_node.lod_far_fade; 
             List<LOD> lods = new List<LOD>();
-            float max_dist = child_lod.lod_far + child_lod.lod_far_fade;
-            float far_percent = 1.0f - ((child_lod.lod_far + (child_lod.lod_far_fade/1.25f)) / max_dist); // 
-            float near_percent = 1.0f - ((child_lod.lod_near + 0.6f*(child_lod.lod_far-child_lod.lod_near))/ max_dist);
-            var lodentry = new LOD(near_percent, new[] {inside.GetComponent<Renderer>()});
-            lodentry.fadeTransitionWidth = child_lod.lod_far_fade / max_dist;
-            lods.Add(lodentry);
-            lodentry = new LOD(far_percent, new[] {child_lod.generated.GetComponent<Renderer>()});
-            lodentry.fadeTransitionWidth = 0.1f;
+            LOD lodentry;
+            foreach (SceneNode node in lod_sorted.Values)
+            {
+                float far_percent = 1.0f - ((node.lod_far + (node.lod_far_fade/1.25f)) / max_dist); // 
+                float near_percent = 1.0f - ((node.lod_near + 0.6f*(node.lod_far-node.lod_near))/ max_dist);
+                lodentry = new LOD(near_percent, new[] {node.generated.GetComponent<Renderer>()});
+                lodentry.fadeTransitionWidth = node.lod_far_fade / max_dist;
+                lods.Add(lodentry);
+            }
+            lodentry = new LOD(0.03f, new[] {inside.GetComponent<Renderer>()});
             lods.Add(lodentry);
             ldgrp.SetLODs(lods.ToArray());
         }
@@ -483,8 +485,13 @@ public class GEOImporter : ScriptedImporter
         public bool depthWrite;
         public bool isAdditive;
         public CullMode targetCulling;
-
+        public CompareFunction depthTest;
+        public override int GetHashCode()
+        {
+            return Tuple.Create(depthWrite, isAdditive,targetCulling,depthTest).GetHashCode();
+        }
     }
+
     private static void convertMaterials(MeshRenderer ren, Model mdl, GameObject tgt)
     {
         ModelModifiers model_trick = mdl.trck_node;
@@ -492,8 +499,7 @@ public class GEOImporter : ScriptedImporter
         RuntimeData rd = RuntimeData.get();
         MaterialDescriptor descriptor;
 
-        string model_base_name = mdl.name.Split(new string[] {"__"}, StringSplitOptions.None)[0];
-        bool isDoubleSided = false;
+        string model_base_name = mdl.name.Split(new[] {"__"}, StringSplitOptions.None)[0];
         string mesh_path = mdl.geoset.full_geo_path;
         int obj_lib_idx = mesh_path.IndexOf("object_library");
         if (obj_lib_idx != -1)
@@ -518,9 +524,11 @@ public class GEOImporter : ScriptedImporter
         descriptor.depthWrite = true;
         descriptor.isAdditive = false;
         descriptor.targetCulling = UnityEngine.Rendering.CullMode.Back;
+        descriptor.depthTest = CompareFunction.LessEqual;
+        descriptor.targetCulling = UnityEngine.Rendering.CullMode.Back;
+
         string shader_to_use = "";
 
-        bool disableZtest = false;
         if (null != model_trick && model_trick._TrickFlags != 0)
         {
             var tflags = model_trick._TrickFlags;
@@ -532,11 +540,11 @@ public class GEOImporter : ScriptedImporter
             if (tflags.HasFlag(TrickFlags.ColorOnly))
                 onlyColor = model_trick.TintColor0;
             if (tflags.HasFlag(TrickFlags.DoubleSided))
-                isDoubleSided = true;
+                descriptor.targetCulling = UnityEngine.Rendering.CullMode.Off;
             if (tflags.HasFlag(TrickFlags.NoZTest))
             {
                 // simulate disabled Z test
-                disableZtest = true;
+                descriptor.depthTest = CompareFunction.Always;
                 //depthTest = CompareFunction.Always;
                 descriptor.depthWrite = false;
             }
@@ -569,18 +577,12 @@ public class GEOImporter : ScriptedImporter
             if (tflags.HasFlag(TrickFlags.TexBias))
                 Debug.Log("Unhandled TexBias");
         }
-        if(isDoubleSided)
-            descriptor.targetCulling = UnityEngine.Rendering.CullMode.Off;
-        else
-            descriptor.targetCulling = UnityEngine.Rendering.CullMode.Back;
 
         CompareFunction depthTest = CompareFunction.LessEqual;
         TextureWrapper whitetex = GeoSet.loadTexHeader("white");
-        var vertex_defines = new List<string>();
         var pixel_defines = new List<string>();
         pixel_defines.Add("DIFFMAP");
         pixel_defines.Add("ALPHAMASK");
-        string shader_name;
         switch (mdl.BlendMode)
         {
             case CoHBlendMode.MULTIPLY:
@@ -589,7 +591,6 @@ public class GEOImporter : ScriptedImporter
             case CoHBlendMode.MULTIPLY_REG:
                 if (!descriptor.depthWrite && descriptor.isAdditive)
                 {
-                    shader_name = "AddAlpha";
                     descriptor.targetCulling = UnityEngine.Rendering.CullMode.Off;
                 }
 
@@ -605,38 +606,21 @@ public class GEOImporter : ScriptedImporter
                 pixel_defines.Add("COH_ALPHADETAIL");
                 break;
             case CoHBlendMode.BUMPMAP_MULTIPLY:
-                shader_name = "TexturedDualBump";
                 pixel_defines.Add("COH_MULTIPLY");
                 break;
             case CoHBlendMode.BUMPMAP_COLORBLEND_DUAL:
-                shader_name = "TexturedDualBump";
                 pixel_defines.Add("COH_COLOR_BLEND_DUAL");
                 break;
         }
 
         if (mdl.flags.HasFlag(ModelFlags.OBJ_TREE))
         {
-            //preconverted.SetVertexShaderDefines("TRANSLUCENT");
-            pixel_defines.Add("TRANSLUCENT");
+            shader_to_use = "CoH/Vegetation";
             alphaRef = 0.4f;
             tint1.a = 254.0f / 255.0f;
         }
 
-        if (alphaRef != 0.0f)
-        {
-            //preconverted.SetShaderParameter("AlphaRef",alphaRef);
-        }
-    
-        /*
-        preconverted.SetPixelShaderDefines(pixel_defines.join(' '));
-        if(isDoubleSided)
-            preconverted.SetCullMode(CULL_NONE);
-    
-        // int mode= dualTexture ? 4 : 5
-        bool is_single_mat = mdl.texture_bind_info.Count == 1;
-        */
         Material[] materials = new Material[mdl.texture_bind_info.Count];
-        Material additive = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/InstancedAdditive.mat");
         int idx = 0;
         Tools.EnsureDirectoryExists(material_base_path);
         var sup = tgt.GetComponent<ModelNodeMods>();
@@ -645,7 +629,12 @@ public class GEOImporter : ScriptedImporter
         Shader selected=null;
         if (descriptor.isAdditive)
         {
-            selected = Shader.Find("Unlit/Additive");
+            if (shader_to_use == "Custom/ReflectGen")
+            {
+                selected = Shader.Find("Custom/ReflectGen");
+            }
+            else
+                selected = Shader.Find("Unlit/Additive");
         }
         else
         {
@@ -656,9 +645,10 @@ public class GEOImporter : ScriptedImporter
         }
                                         
         sup.TexWrappers = vbo.assigned_textures;
+
         foreach (TextureWrapper wrap in vbo.assigned_textures)
         {
-            string path_material_name = String.Format("{0}/{1}.mat", material_base_path, idx);
+            string path_material_name = String.Format("{0}/{1}_{2}.mat", material_base_path, idx,descriptor.GetHashCode());
             Material available = AssetDatabase.LoadAssetAtPath<Material>(path_material_name);
             if (available == null)
             {
@@ -669,58 +659,29 @@ public class GEOImporter : ScriptedImporter
                     {
                         detail = GeoSet.loadTexHeader(wrap.detailname);
                     }
+                    
 
                     Material mat= new Material(selected);
+                    mat.enableInstancing = true;
                     mat.SetColor("_Color", tint1);
                     mat.SetColor("_Color2", tint2);
                     mat.SetFloat("_AlphaRef",alphaRef);
+                    mat.SetInt("_CoHMod",(int)mdl.BlendMode);
 
                     mat.SetTexture("_MainTex", wrap.tex);
                     if (detail != null)
                         mat.SetTexture("_Detail", detail.tex);
-                    if(!descriptor.depthWrite)
-                        mat.SetInt("_ZWrite", 0);
-                    if (disableZtest)
-                        mat.SetInt(ZTest, (int) CompareFunction.Always);
-                    
+                    mat.SetInt("_ZWrite", descriptor.depthWrite ? 1 : 0);
+                    mat.SetInt(ZTest, (int) descriptor.depthTest);
                     mat.SetInt(CullMode, (int) descriptor.targetCulling);
                     mat.SetTextureScale(MainTex,wrap.scaleUV1);
                     mat.SetTextureScale(Detail,wrap.scaleUV0);
-                    mat.SetInt("_CoHMod",(int)mdl.BlendMode);
                     AssetDatabase.CreateAsset(mat, path_material_name);
                     AssetDatabase.SaveAssets();
                     available = AssetDatabase.LoadAssetAtPath<Material>(path_material_name);
                 }
             }
-
             materials[idx++] = available;
-            /*
-            HTexture tex = tryLoadTexture(ctx,texname);
-            auto iter = g_converted_textures.find(tex.idx);
-            geomidx++;
-            if(iter==g_converted_textures.end())
-                continue;
-            string mat_name = string.Format("Materials/{0}{1}_mtl.xml",model_base_name,geomidx-1);
-            Material cached_mat = cache.GetResource<Material>(mat_name,false);
-            Urho3D.SharedPtr<Urho3D.Texture> &engine_tex(iter.second);
-            if(cached_mat && cached_mat.GetTexture(TU_DIFFUSE)==engine_tex)
-            {
-                boxObject.SetMaterial(geomidx-1,cached_mat);
-                continue;
-            }
-            result = is_single_mat ? preconverted : preconverted.Clone();
-            result.SetTexture(TU_DIFFUSE,engine_tex);
-            if(tex.info)
-            {
-                if(!tex.info.Blend.isEmpty())
-                    custom1 = tryLoadTexture(ctx,tex.info.Blend);
-                if(!tex.info.BumpMap.isEmpty())
-                    bump_tex = tryLoadTexture(ctx,tex.info.BumpMap);
-            }
-            result.SetTexture(TU_CUSTOM1,g_converted_textures[custom1.idx]);
-            if(bump_tex)
-                result.SetTexture(TU_NORMAL,g_converted_textures[bump_tex.idx]);
-            */
         }
 
         if (mdl.flags.HasFlag(ModelFlags.OBJ_HIDE))

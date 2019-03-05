@@ -4,6 +4,7 @@
     {
         _MainTex ("Texture", 2D) = "white" {}
         _Detail ("Detail", 2D) = "grey" {}
+        _Metallic("Metallic",Range(0,1)) = 0.0
         [PerRenderData] _Color("Color", Color) = (1,1,1,1)
     }
 
@@ -14,7 +15,7 @@
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
         CGPROGRAM
-            #pragma surface surf Standard  vertex:vert  alpha
+            #pragma surface surf Standard  vertex:vert  alpha:premul
             struct Input {
                 float2 uv_MainTex : TEXCOORD0;
                 float2 gen_uv : TEXCOORD2;
@@ -25,6 +26,7 @@
             sampler2D _MainTex;
             sampler2D _Detail;
             float _AlphaRef;
+            float _Metallic;
             fixed4 _Color,_Secondary;
             int _CoHMod;
 
@@ -44,8 +46,10 @@
             void surf (Input IN, inout SurfaceOutputStandard o) {
                 float4 res=tex2D (_MainTex, IN.gen_uv);
                 //o.Albedo = res.rgb;
-                o.Albedo.rgb = res;
-                o.Alpha = res.a;
+                o.Albedo.rgb = 0;
+                o.Alpha = 0.7;
+                o.Metallic = _Metallic;
+                o.Smoothness =0.99f;
             }
         ENDCG
     }
